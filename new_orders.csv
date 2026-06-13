@@ -1,0 +1,7 @@
+order_code,customer_name,quantity,status
+ORD001,Mario Rossi,12,completed
+ORD003,Anna Verdi,3,pending
+ORD004,,5,completed
+ORD005,Luca Bianchi,0,pending
+ORD006,Sara Neri,7,unknown
+ORD003,Paolo Gialli,4,completed
