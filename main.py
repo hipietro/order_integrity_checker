@@ -162,9 +162,11 @@ def validate_order(order, order_codes_in_file):
     # More advanced error handling can be added later.
     if quantity_text == "":
         errors.append("missing quantity")
+    elif not quantity_text.isdigit():
+        errors.append("quantity must be a valid number")
     elif int(quantity_text) <= 0:
         errors.append("quantity must be greater than zero")
-
+    
     # Check if the order status is one of the accepted values.
     if status not in VALID_STATUSES:
         errors.append("invalid status")

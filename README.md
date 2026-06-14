@@ -63,6 +63,7 @@ An order is considered invalid if:
 * the quantity is missing
 * the quantity is less than or equal to zero
 * the status is not supported
+* the quantity is not a valid number
 
 Supported statuses are:
 
@@ -137,7 +138,6 @@ At the moment:
 
 * valid orders are checked but not inserted into the database
 * the program only supports CSV input
-* quantity values are expected to be valid numbers
 * the code is still contained in a single Python file
 * no report file is generated yet
 
