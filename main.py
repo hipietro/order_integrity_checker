@@ -245,7 +245,7 @@ def import_valid_orders():
             print(f"{order_code}: saved into database")
         else:
             invalid_orders = invalid_orders + 1
-            print(f"{order_code}: not saved because it is invalid")
+            print(f"{order_code}: NOT saved. For reasons: press 2")
 
     print("\nSUMMARY")
     print("-------")
@@ -321,8 +321,21 @@ def show_database_orders():
                 f"Status: {order[4]}"
             )
 
+def clear_csv_orders():
+    """
+    Clears the CSV file while keeping the header row.
+
+    This allows the file to remain valid and ready for new orders.
+    """
+
+    with open(CSV_FILE_NAME, "w") as file:
+        file.write("order_code,customer_name,quantity,status\n")
+
+    print(f"{CSV_FILE_NAME} cleared successfully.")
 
 def show_menu():
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
     """
     Shows the main menu and handles the user's choices.
     """
@@ -333,7 +346,8 @@ def show_menu():
         print("1. Import valid CSV orders into database")
         print("2. Show invalid CSV orders")
         print("3. Show database orders")
-        print("4. Exit")
+        print("4. Clear new orders.csv file")
+        print("5. Exit")
 
         choice = input("\nChoose an option: ")
 
@@ -344,8 +358,11 @@ def show_menu():
         elif choice == "3":
             show_database_orders()
         elif choice == "4":
+            clear_csv_orders()
+        elif choice == "5":
             print("Goodbye!")
             break
+        
         else:
             print("Invalid option. Please choose 1, 2, 3, or 4.")
 
