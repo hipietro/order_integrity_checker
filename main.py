@@ -23,16 +23,9 @@ def create_database():
     duplicate order codes.
     """
 
-    # Open a connection to the SQLite database.
-    # If the database file does not exist, SQLite creates it automatically.
     connection = sqlite3.connect(DATABASE_NAME)
-
-    # The cursor is used to execute SQL commands.
     cursor = connection.cursor()
 
-    # Create the orders table only if it does not already exist.
-    # The order_code field is marked as UNIQUE because two orders should not have
-    # the same business identifier.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,10 +36,7 @@ def create_database():
         )
     """)
 
-    # Save the changes to the database.
     connection.commit()
-
-    # Close the database connection.
     connection.close()
 
 
@@ -61,16 +51,11 @@ def insert_sample_orders():
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
-    # Sample orders already stored in the database.
-    # ORD001 is intentionally used also inside the CSV file to test the duplicate check.
     sample_orders = [
         ("ORD001", "Mario Rossi", 12, "completed"),
         ("ORD002", "Luca Bianchi", 5, "pending"),
     ]
 
-    # Insert each sample order.
-    # INSERT OR IGNORE prevents the program from crashing if the same sample order
-    # already exists from a previous execution.
     for order in sample_orders:
         cursor.execute("""
             INSERT OR IGNORE INTO orders (order_code, customer_name, quantity, status)
@@ -96,20 +81,61 @@ def order_exists_in_database(order_code):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
-    # The question mark is a placeholder.
-    # It allows SQLite to safely insert the value of order_code into the query.
     cursor.execute("""
         SELECT order_code
         FROM orders
         WHERE order_code = ?
     """, (order_code,))
 
-    # fetchone() returns the first matching row, or None if no row was found.
     result = cursor.fetchone()
 
     connection.close()
 
     return result is not None
+
+
+def insert_order_into_database(order):
+    """
+    Inserts a valid order into the SQLite database.
+
+    This function is called only after the order has passed all validation checks.
+    """
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO orders (order_code, customer_name, quantity, status)
+        VALUES (?, ?, ?, ?)
+    """, (
+        order["order_code"],
+        order["customer_name"],
+        int(order["quantity"]),
+        order["status"]
+    ))
+
+    connection.commit()
+    connection.close()
+
+
+def read_orders_from_csv():
+    """
+    Reads all orders from the CSV file.
+
+    Returns:
+        A list of orders.
+        Each order is represented as a dictionary.
+    """
+
+    orders = []
+
+    with open(CSV_FILE_NAME, "r") as file:
+        reader = csv.DictReader(file)
+
+        for order in reader:
+            orders.append(order)
+
+    return orders
 
 
 def validate_order(order, order_codes_in_file):
@@ -118,8 +144,8 @@ def validate_order(order, order_codes_in_file):
 
     The function checks:
     - missing order code
-    - duplicated order code in the database
     - duplicated order code inside the CSV file
+    - duplicated order code in the database
     - missing or too short customer name
     - missing or invalid quantity
     - unsupported order status
@@ -135,115 +161,197 @@ def validate_order(order, order_codes_in_file):
 
     errors = []
 
-    # Extract the values from the CSV row.
-    # csv.DictReader uses the first line of the CSV file as field names.
     order_code = order["order_code"]
     customer_name = order["customer_name"]
     quantity_text = order["quantity"]
     status = order["status"]
 
-    # Check if the order code is missing, already present in the database,
-    # or duplicated inside the same CSV file.
     if order_code == "":
         errors.append("missing order code")
-    elif order_exists_in_database(order_code):
-        errors.append("order code already exists in database")
     elif order_code in order_codes_in_file:
         errors.append("duplicated order code inside CSV file")
+    elif order_exists_in_database(order_code):
+        errors.append("order code already exists in database")
 
-    # Check if the customer name is missing or too short.
     if customer_name == "":
         errors.append("missing customer name")
     elif len(customer_name) < 3:
         errors.append("customer name too short")
 
-    # Check if the quantity is missing or not greater than zero.
-    # At this stage, the project assumes that the quantity field contains a number.
-    # More advanced error handling can be added later.
     if quantity_text == "":
         errors.append("missing quantity")
     elif not quantity_text.isdigit():
         errors.append("quantity must be a valid number")
     elif int(quantity_text) <= 0:
         errors.append("quantity must be greater than zero")
-    
-    # Check if the order status is one of the accepted values.
+
     if status not in VALID_STATUSES:
         errors.append("invalid status")
 
     return errors
 
 
-def check_orders_from_csv():
+def validate_all_csv_orders():
     """
-    Reads the CSV file, validates each order, and prints a final summary.
+    Validates all orders from the CSV file.
 
-    This function represents the main workflow of the program:
-    1. open the CSV file
-    2. read each order
-    3. validate the order
-    4. print validation errors
-    5. print a final summary
+    Returns:
+        A list of validation results.
+
+    Each validation result contains:
+    - the original order
+    - the list of validation errors
     """
+
+    orders = read_orders_from_csv()
+    order_codes_in_file = []
+    validation_results = []
+
+    for order in orders:
+        errors = validate_order(order, order_codes_in_file)
+
+        validation_results.append({
+            "order": order,
+            "errors": errors
+        })
+
+        order_codes_in_file.append(order["order_code"])
+
+    return validation_results
+
+
+def import_valid_orders():
+    """
+    Validates all CSV orders and saves only valid orders into the database.
+    Invalid orders are not inserted.
+    """
+
+    validation_results = validate_all_csv_orders()
 
     valid_orders = 0
     invalid_orders = 0
 
-    # This list is used to detect duplicated order codes inside the CSV file itself.
-    order_codes_in_file = []
+    print("\nIMPORT RESULT")
+    print("-------------")
 
-    print("ORDER INTEGRITY CHECKER")
-    print("-----------------------")
+    for result in validation_results:
+        order = result["order"]
+        errors = result["errors"]
+        order_code = order["order_code"]
 
-    # Open the CSV file in read mode.
-    # DictReader converts each row into a dictionary.
-    # Example:
-    # {
-    #     "order_code": "ORD001",
-    #     "customer_name": "Mario Rossi",
-    #     "quantity": "12",
-    #     "status": "completed"
-    # }
-    with open(CSV_FILE_NAME, "r") as file:
-        reader = csv.DictReader(file)
+        if len(errors) == 0:
+            insert_order_into_database(order)
+            valid_orders = valid_orders + 1
+            print(f"{order_code}: saved into database")
+        else:
+            invalid_orders = invalid_orders + 1
+            print(f"{order_code}: not saved because it is invalid")
 
-        # Process one order at a time.
-        for order in reader:
-            order_code = order["order_code"]
-
-            print(f"\nChecking order: {order_code}")
-
-            # Validate the current order and collect all errors.
-            errors = validate_order(order, order_codes_in_file)
-
-            # If there are no errors, the order is valid.
-            if len(errors) == 0:
-                print("Result: valid order")
-                valid_orders = valid_orders + 1
-
-            # Otherwise, print all validation errors.
-            else:
-                print("Result: invalid order")
-                invalid_orders = invalid_orders + 1
-
-                for error in errors:
-                    print(f"- {error}")
-
-            # Add the current order code to the list of codes already seen in the CSV.
-            # This is done after validation so that the first occurrence is not marked
-            # as a duplicate, while later occurrences are.
-            order_codes_in_file.append(order_code)
-
-    # Print the final validation summary.
     print("\nSUMMARY")
     print("-------")
-    print(f"Valid orders: {valid_orders}")
+    print(f"Saved orders: {valid_orders}")
     print(f"Invalid orders: {invalid_orders}")
 
 
+def show_invalid_orders():
+    """
+    Shows only the invalid orders found in the CSV file.
+
+    For each invalid order, the function prints the order code and the reasons
+    why the order is not valid.
+    """
+
+    validation_results = validate_all_csv_orders()
+
+    found_invalid_orders = False
+
+    print("\nINVALID CSV ORDERS")
+    print("------------------")
+
+    for result in validation_results:
+        order = result["order"]
+        errors = result["errors"]
+
+        if len(errors) > 0:
+            found_invalid_orders = True
+
+            print(f"\nOrder code: {order['order_code']}")
+            print(f"Customer name: {order['customer_name']}")
+            print(f"Quantity: {order['quantity']}")
+            print(f"Status: {order['status']}")
+            print("Errors:")
+
+            for error in errors:
+                print(f"- {error}")
+
+    if not found_invalid_orders:
+        print("No invalid orders found.")
+
+
+def show_database_orders():
+    """
+    Prints all orders currently stored in the SQLite database.
+    """
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT id, order_code, customer_name, quantity, status
+        FROM orders
+        ORDER BY id
+    """)
+
+    orders = cursor.fetchall()
+
+    connection.close()
+
+    print("\nDATABASE ORDERS")
+    print("---------------")
+
+    if len(orders) == 0:
+        print("No orders found in the database.")
+    else:
+        for order in orders:
+            print(
+                f"ID: {order[0]} | "
+                f"Code: {order[1]} | "
+                f"Customer: {order[2]} | "
+                f"Quantity: {order[3]} | "
+                f"Status: {order[4]}"
+            )
+
+
+def show_menu():
+    """
+    Shows the main menu and handles the user's choices.
+    """
+
+    while True:
+        print("\nORDER INTEGRITY CHECKER")
+        print("-----------------------")
+        print("1. Import valid CSV orders into database")
+        print("2. Show invalid CSV orders")
+        print("3. Show database orders")
+        print("4. Exit")
+
+        choice = input("\nChoose an option: ")
+
+        if choice == "1":
+            import_valid_orders()
+        elif choice == "2":
+            show_invalid_orders()
+        elif choice == "3":
+            show_database_orders()
+        elif choice == "4":
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid option. Please choose 1, 2, 3, or 4.")
+
+
 # Program entry point.
-# These three steps prepare the database, insert sample data, and then validate
-# the orders coming from the CSV file.
+# The database is prepared before showing the menu.
 create_database()
 insert_sample_orders()
-check_orders_from_csv()
+show_menu()
