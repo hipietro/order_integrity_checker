@@ -333,6 +333,40 @@ def clear_csv_orders():
 
     print(f"{CSV_FILE_NAME} cleared successfully.")
 
+def insert_order_manually():
+    """
+    Allows the user to insert a new order manually through the command line.
+
+    The function prompts the user for each field of the order, validates the input,
+    and if the order is valid, it is saved into the database.
+    """
+
+    print("\nINSERT NEW ORDER")
+    print("----------------")
+
+    order_code = input("Order code: ")
+    customer_name = input("Customer name: ")
+    quantity = input("Quantity: ")
+    status = input("Status (completed, pending, cancelled): ")
+
+    order = {
+        "order_code": order_code,
+        "customer_name": customer_name,
+        "quantity": quantity,
+        "status": status
+    }
+
+    errors = validate_order(order, [])
+
+    if len(errors) == 0:
+        insert_order_into_database(order)
+        print(f"Order {order_code} inserted successfully.")
+    else:
+        print(f"Order {order_code} is invalid. Errors:")
+        for error in errors:
+            print(f"- {error}")
+
+
 def show_menu():
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
@@ -347,7 +381,8 @@ def show_menu():
         print("2. Show invalid CSV orders")
         print("3. Show database orders")
         print("4. Clear new orders.csv file")
-        print("5. Exit")
+        print("5. Insert order manually")
+        print("6. Exit")
 
         choice = input("\nChoose an option: ")
 
@@ -360,6 +395,8 @@ def show_menu():
         elif choice == "4":
             clear_csv_orders()
         elif choice == "5":
+            insert_order_manually()
+        elif choice == "6":
             print("Goodbye!")
             break
         
