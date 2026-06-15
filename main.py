@@ -366,10 +366,139 @@ def insert_order_manually():
         for error in errors:
             print(f"- {error}")
 
+def search_order_by_code():
+    """
+    Searches for an order in the SQLite database using its order code.
 
-def show_menu():
+    The function asks the user to type an order code, then searches the database
+    and prints the matching order if it exists.
+    """
+
+    order_code = input("Enter order code to search: ")
+
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT id, order_code, customer_name, quantity, status
+        FROM orders
+        WHERE order_code = ?
+    """, (order_code,))
+
+    order = cursor.fetchone()
+
+    connection.close()
+
+    print("\nSEARCH RESULT")
+    print("-------------")
+
+    if order is None:
+        print(f"No order found with code {order_code}.")
+    else:
+        print(
+            f"ID: {order[0]} | "
+            f"Code: {order[1]} | "
+            f"Customer: {order[2]} | "
+            f"Quantity: {order[3]} | "
+            f"Status: {order[4]}"
+        )
+
+def show_order_statistics():
+    """
+    Shows statistics about the orders stored in the database.
+
+    The function counts how many orders exist for each status:
+    completed, pending, and cancelled.
+    """
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT status, COUNT(*)
+        FROM orders
+        GROUP BY status
+    """)
+
+    results = cursor.fetchall()
+
+    connection.close()
+
+    statistics = {
+        "completed": 0,
+        "pending": 0,
+        "cancelled": 0
+    }
+
+    for result in results:
+        status = result[0]
+        count = result[1]
+
+        statistics[status] = count
+
+    print("\nORDER STATISTICS")
+    print("----------------")
+    print(f"Completed orders: {statistics['completed']}")
+    print(f"Pending orders: {statistics['pending']}")
+    print(f"Cancelled orders: {statistics['cancelled']}")
+    print(f"Total orders: {sum(statistics.values())}")
+
+
+def update_order_status():
+    """
+    Updates the status of an existing order in the SQLite database.
+
+    The function asks the user for an order code, checks if the order exists,
+    then asks for a new status and updates the database if the status is valid.
+    """
+
+    order_code = input("Enter order code to update: ")
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT id, order_code, customer_name, quantity, status
+        FROM orders
+        WHERE order_code = ?
+    """, (order_code,))
+
+    order = cursor.fetchone()
+
+    if order is None:
+        connection.close()
+        print(f"No order found with code {order_code}.")
+        return
+
+    print("\nORDER FOUND")
+    print("-----------")
+    print(
+        f"ID: {order[0]} | "
+        f"Code: {order[1]} | "
+        f"Customer: {order[2]} | "
+        f"Quantity: {order[3]} | "
+        f"Current status: {order[4]}"
+    )
+
+    new_status = input("Enter new status (completed, pending, cancelled): ")
+
+    if new_status not in VALID_STATUSES:
+        connection.close()
+        print(f"Invalid status. Accepted values are: {', '.join(VALID_STATUSES)}")
+        return
+
+    cursor.execute("""
+        UPDATE orders
+        SET status = ?
+        WHERE order_code = ?
+    """, (new_status, order_code))
+
+    connection.commit()
+    connection.close()
+
+    print(f"Order {order_code} updated successfully.")
+
+def show_menu():
     """
     Shows the main menu and handles the user's choices.
     """
@@ -380,9 +509,12 @@ def show_menu():
         print("1. Import valid CSV orders into database")
         print("2. Show invalid CSV orders")
         print("3. Show database orders")
-        print("4. Clear new orders.csv file")
-        print("5. Insert order manually")
-        print("6. Exit")
+        print("4. Clear new_orders.csv file")
+        print("5. Search order by code")
+        print("6. Insert order manually")
+        print("7. Show order statistics")
+        print("8. Update order status")
+        print("9. Exit")
 
         choice = input("\nChoose an option: ")
 
@@ -395,13 +527,18 @@ def show_menu():
         elif choice == "4":
             clear_csv_orders()
         elif choice == "5":
-            insert_order_manually()
+            search_order_by_code()
         elif choice == "6":
+            insert_order_manually()
+        elif choice == "7":
+            show_order_statistics()
+        elif choice == "8":
+            update_order_status()
+        elif choice == "9":
             print("Goodbye!")
             break
-        
         else:
-            print("Invalid option. Please choose 1, 2, 3, or 4.")
+            print("Invalid option. Please choose a number from 1 to 9.")
 
 
 # Program entry point.
