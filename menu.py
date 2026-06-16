@@ -6,13 +6,18 @@ from database import (
     show_order_statistics,
     update_order_status
 )
-from validator import show_invalid_orders, validate_all_csv_orders, validate_order
+from validator import (
+    generate_invalid_orders_report,
+    show_invalid_orders,
+    validate_all_csv_orders,
+    validate_order
+)
 
 
 def import_valid_orders():
     """
-    Validates all CSV orders and saves only valid orders into the database.
-    Invalid orders are not inserted.
+    Validates all CSV orders, saves only valid orders into the database,
+    and automatically generates a report for invalid orders.
     """
 
     validation_results = validate_all_csv_orders()
@@ -34,13 +39,19 @@ def import_valid_orders():
             print(f"{order_code}: saved into database")
         else:
             invalid_orders = invalid_orders + 1
-            print(f"{order_code}: NOT saved. For reasons: press 2")
+            print(f"{order_code}: NOT saved. Check the invalid orders report for details.")
+
+    report_invalid_orders = generate_invalid_orders_report(validation_results)
 
     print("\nSUMMARY")
     print("-------")
     print(f"Saved orders: {valid_orders}")
     print(f"Invalid orders: {invalid_orders}")
 
+    if report_invalid_orders > 0:
+        print("Invalid orders report generated: invalid_orders_report.txt")
+    else:
+        print("Invalid orders report generated: no invalid orders found.")
 
 def insert_order_manually():
     """

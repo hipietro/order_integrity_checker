@@ -1,4 +1,4 @@
-from config import VALID_STATUSES
+from config import VALID_STATUSES, REPORT_FILE_NAME
 from csv_manager import read_orders_from_csv
 from database import order_exists_in_database
 
@@ -118,3 +118,40 @@ def show_invalid_orders():
 
     if not found_invalid_orders:
         print("No invalid orders found.")
+
+def generate_invalid_orders_report(validation_results):
+    """
+    Generates a text report containing all invalid CSV orders and their errors.
+
+    The report is regenerated every time the CSV import process runs.
+    """
+
+    invalid_orders = []
+
+    for result in validation_results:
+        if len(result["errors"]) > 0:
+            invalid_orders.append(result)
+
+    with open(REPORT_FILE_NAME, "w") as file:
+        file.write("INVALID ORDERS REPORT\n")
+        file.write("---------------------\n\n")
+
+        if len(invalid_orders) == 0:
+            file.write("No invalid orders found.\n")
+        else:
+            for result in invalid_orders:
+                order = result["order"]
+                errors = result["errors"]
+
+                file.write(f"Order code: {order['order_code']}\n")
+                file.write(f"Customer name: {order['customer_name']}\n")
+                file.write(f"Quantity: {order['quantity']}\n")
+                file.write(f"Status: {order['status']}\n")
+                file.write("Errors:\n")
+
+                for error in errors:
+                    file.write(f"- {error}\n")
+
+                file.write("\n")
+
+    return len(invalid_orders)
