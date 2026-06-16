@@ -13,11 +13,43 @@ from validator import (
     validate_order
 )
 
+def show_validation_problems(validation_results):
+    """
+    Shows invalid orders from already calculated validation results.
+
+    This function is used during the import confirmation flow, so the user can
+    inspect validation problems before deciding whether to continue or cancel.
+    """
+
+    found_invalid_orders = False
+
+    print("\nINVALID CSV ORDERS")
+    print("------------------")
+
+    for result in validation_results:
+        order = result["order"]
+        errors = result["errors"]
+
+        if len(errors) > 0:
+            found_invalid_orders = True
+
+            print(f"\nOrder code: {order['order_code']}")
+            print(f"Customer name: {order['customer_name']}")
+            print(f"Quantity: {order['quantity']}")
+            print(f"Status: {order['status']}")
+            print("Errors:")
+
+            for error in errors:
+                print(f"- {error}")
+
+    if not found_invalid_orders:
+        print("No invalid orders found.")
 
 def import_valid_orders():
     """
-    Validates all CSV orders, saves only valid orders into the database,
-    and automatically generates a report for invalid orders.
+    Validates all CSV orders, asks for confirmation, saves only valid orders into
+    the database, generates a report for invalid orders, and clears the CSV file
+    after the import is completed.
     """
 
     validation_results = validate_all_csv_orders()
@@ -25,33 +57,59 @@ def import_valid_orders():
     valid_orders = 0
     invalid_orders = 0
 
-    print("\nIMPORT RESULT")
-    print("-------------")
-
     for result in validation_results:
-        order = result["order"]
-        errors = result["errors"]
-        order_code = order["order_code"]
-
-        if len(errors) == 0:
-            insert_order_into_database(order)
+        if len(result["errors"]) == 0:
             valid_orders = valid_orders + 1
-            print(f"{order_code}: saved into database")
         else:
             invalid_orders = invalid_orders + 1
-            print(f"{order_code}: NOT saved. Check the invalid orders report for details.")
 
-    report_invalid_orders = generate_invalid_orders_report(validation_results)
+    print("\nIMPORT CHECK")
+    print("------------")
+    print(f"Valid orders ready to import: {valid_orders}")
+    print(f"Invalid orders found: {invalid_orders}")
 
-    print("\nSUMMARY")
-    print("-------")
-    print(f"Saved orders: {valid_orders}")
-    print(f"Invalid orders: {invalid_orders}")
+    while True:
+        choice = input("\nChoose: y = import, n = cancel, w = show problems: ")
 
-    if report_invalid_orders > 0:
-        print("Invalid orders report generated: invalid_orders_report.txt")
-    else:
-        print("Invalid orders report generated: no invalid orders found.")
+        if choice == "w":
+            show_validation_problems(validation_results)
+
+        elif choice == "n":
+            print("Import cancelled. No orders were saved and the CSV file was not cleared.")
+            return
+
+        elif choice == "y":
+            saved_orders = 0
+
+            print("\nIMPORT RESULT")
+            print("-------------")
+
+            for result in validation_results:
+                order = result["order"]
+                errors = result["errors"]
+                order_code = order["order_code"]
+
+                if len(errors) == 0:
+                    insert_order_into_database(order)
+                    saved_orders = saved_orders + 1
+                    print(f"{order_code}: saved into database")
+                else:
+                    print(f"{order_code}: NOT saved. Check the invalid orders report for details.")
+
+            generate_invalid_orders_report(validation_results)
+            clear_csv_orders()
+
+            print("\nSUMMARY")
+            print("-------")
+            print(f"Saved orders: {saved_orders}")
+            print(f"Invalid orders: {invalid_orders}")
+            print("Invalid orders report generated: invalid_orders_report.txt")
+            print("CSV file cleared after import.")
+
+            return
+
+        else:
+            print("Invalid option. Please choose y, n, or w.")
 
 def insert_order_manually():
     """
