@@ -1,5 +1,6 @@
 from csv_manager import clear_csv_orders
 from database import (
+    delete_order_by_code,
     insert_order_into_database,
     search_order_by_code,
     show_database_orders,
@@ -161,7 +162,8 @@ def show_menu():
         print("6. Insert order manually")
         print("7. Show order statistics")
         print("8. Update order status")
-        print("9. Exit")
+        print("9. Delete order by code")
+        print("10. Exit")
 
         choice = input("\nChoose an option: ")
 
@@ -182,7 +184,9 @@ def show_menu():
         elif choice == "8":
             update_order_status()
         elif choice == "9":
+            delete_order_by_code()
+        elif choice == "10":
             print("Goodbye!")
             break
         else:
-            print("Invalid option. Please choose a number from 1 to 9.")
+            print("Invalid option. Please choose a number from 1 to 10.")

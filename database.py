@@ -273,3 +273,63 @@ def update_order_status():
     connection.close()
 
     print(f"Order {order_code} updated successfully.")
+
+def delete_order_by_code():
+    """
+    Deletes an order from the SQLite database using its order code.
+
+    The function asks the user for an order code, shows the matching order if it
+    exists, and asks for confirmation before deleting it.
+    """
+
+    order_code = input("Enter order code to delete: ").strip()
+
+    if order_code == "":
+        print("Order code cannot be empty.")
+        return
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT id, order_code, customer_name, quantity, status
+        FROM orders
+        WHERE order_code = ?
+    """, (order_code,))
+
+    order = cursor.fetchone()
+
+    connection.close()
+
+    if order is None:
+        print(f"No order found with code {order_code}.")
+        return
+
+    print("\nORDER FOUND")
+    print("-----------")
+    print(
+        f"ID: {order[0]} | "
+        f"Code: {order[1]} | "
+        f"Customer: {order[2]} | "
+        f"Quantity: {order[3]} | "
+        f"Status: {order[4]}"
+    )
+
+    confirmation = input("Are you sure you want to delete this order? y/n: ")
+
+    if confirmation != "y":
+        print("Delete cancelled.")
+        return
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        DELETE FROM orders
+        WHERE order_code = ?
+    """, (order_code,))
+
+    connection.commit()
+    connection.close()
+
+    print(f"Order {order_code} deleted successfully.")
