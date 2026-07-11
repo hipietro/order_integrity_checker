@@ -1,7 +1,7 @@
 from config import VALID_STATUSES, REPORT_FILE_NAME
 from csv_manager import read_orders_from_csv
 from database import order_exists_in_database
-
+from normalizer import normalize_order
 
 def validate_order(order, order_codes_in_file):
     """
@@ -26,6 +26,7 @@ def validate_order(order, order_codes_in_file):
 
     errors = []
 
+    order.update(normalize_order(order))
     order_code = order["order_code"]
     customer_name = order["customer_name"]
     quantity_text = order["quantity"]

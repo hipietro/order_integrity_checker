@@ -13,6 +13,7 @@ from validator import (
     validate_all_csv_orders,
     validate_order
 )
+from normalizer import normalize_order
 
 def show_validation_problems(validation_results):
     """
@@ -134,6 +135,8 @@ def insert_order_manually():
         "quantity": quantity,
         "status": status
     }
+
+    order = normalize_order(order)
 
     errors = validate_order(order, [])
 

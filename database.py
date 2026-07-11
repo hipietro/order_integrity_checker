@@ -1,7 +1,7 @@
 import sqlite3
 
 from config import DATABASE_NAME, VALID_STATUSES
-
+from normalizer import normalize_order, normalize_order_code, normalize_status
 
 def create_database():
     """
@@ -66,6 +66,7 @@ def order_exists_in_database(order_code):
         True if the order code already exists in the database.
         False otherwise.
     """
+    order_code = normalize_order_code(order_code)
 
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
@@ -90,6 +91,8 @@ def insert_order_into_database(order):
     This function is called only after the order has passed all validation checks.
     """
 
+    order = normalize_order(order)
+
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -105,7 +108,6 @@ def insert_order_into_database(order):
 
     connection.commit()
     connection.close()
-
 
 def show_database_orders():
     """
@@ -149,8 +151,7 @@ def search_order_by_code():
     and prints the matching order if it exists.
     """
 
-    order_code = input("Enter order code to search: ")
-
+    order_code = normalize_order_code(input("Enter order code to search: "))
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -228,8 +229,7 @@ def update_order_status():
     then asks for a new status and updates the database if the status is valid.
     """
 
-    order_code = input("Enter order code to update: ")
-
+    order_code = normalize_order_code(input("Enter order code to update: "))
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -256,8 +256,7 @@ def update_order_status():
         f"Current status: {order[4]}"
     )
 
-    new_status = input("Enter new status (completed, pending, cancelled): ")
-
+    new_status = normalize_status(input("Enter new status (completed, pending, cancelled): "))
     if new_status not in VALID_STATUSES:
         connection.close()
         print(f"Invalid status. Accepted values are: {', '.join(VALID_STATUSES)}")
@@ -282,8 +281,7 @@ def delete_order_by_code():
     exists, and asks for confirmation before deleting it.
     """
 
-    order_code = input("Enter order code to delete: ").strip()
-
+    order_code = normalize_order_code(input("Enter order code to delete: "))
     if order_code == "":
         print("Order code cannot be empty.")
         return
