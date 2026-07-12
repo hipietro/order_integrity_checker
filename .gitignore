@@ -1,2 +1,5 @@
 invalid_orders_report.txt
 __pycache__/
+exported_orders.csv
+orders.db
+.DS_Store

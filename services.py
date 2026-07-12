@@ -1,4 +1,5 @@
-from csv_manager import clear_csv_orders
+from config import EXPORT_FILE_NAME
+from csv_manager import clear_csv_orders, export_orders_to_csv
 from database import (
     delete_order_from_database,
     get_all_orders,
@@ -196,4 +197,21 @@ def clear_csv_input():
     return {
         "success": True,
         "message": "CSV file cleared successfully."
+    }
+
+def export_database_orders():
+    """
+    Exports all database orders to a CSV file.
+
+    This function is reusable by both the CLI and a future GUI.
+    """
+
+    orders = get_all_orders()
+
+    exported_orders = export_orders_to_csv(orders)
+
+    return {
+        "success": True,
+        "exported_orders": exported_orders,
+        "file_name": EXPORT_FILE_NAME
     }

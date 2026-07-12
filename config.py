@@ -11,3 +11,6 @@ VALID_STATUSES = ["completed", "pending", "cancelled"]
 
 # Name of the text file where the report of invalid orders will be saved.
 REPORT_FILE_NAME = "invalid_orders_report.txt"
+
+# Name of the CSV file generated when exporting database orders.
+EXPORT_FILE_NAME = "exported_orders.csv"

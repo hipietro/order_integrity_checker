@@ -1,6 +1,6 @@
 import csv
 
-from config import CSV_FILE_NAME
+from config import CSV_FILE_NAME, EXPORT_FILE_NAME
 
 
 def read_orders_from_csv():
@@ -34,3 +34,32 @@ def clear_csv_orders():
         file.write("order_code,customer_name,quantity,status\n")
 
     print(f"{CSV_FILE_NAME} cleared successfully.")
+
+def export_orders_to_csv(orders):
+    '''
+    Exports database orders to a CSV file. 
+
+    Parameters:
+        orders: list of orders coming from the database.
+
+    Returns:
+        The number of exported orders.
+    '''
+
+    fieldnames = ["id", "order_code", "customer_name", "quantity", "status"]
+
+    with open(EXPORT_FILE_NAME, "w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+        writer.writeheader()
+
+        for order in orders:
+            writer.writerow({
+                "id": order["id"],
+                "order_code": order["order_code"],
+                "customer_name": order["customer_name"],
+                "quantity": order["quantity"],
+                "status": order["status"]
+            })
+
+    return len(orders)

@@ -3,6 +3,7 @@ from services import (
     clear_csv_input,
     create_order,
     delete_order,
+    export_database_orders,
     get_database_orders,
     get_statistics,
     import_csv_orders,
@@ -256,6 +257,18 @@ def delete_order_by_code_cli():
 
     print(result["message"])
 
+def export_database_orders_cli():
+    """
+    Exports database orders from the command-line interface.
+    """
+
+    result = export_database_orders()
+
+    print("\nEXPORT RESULT")
+    print("-------------")
+    print(f"Exported orders: {result['exported_orders']}")
+    print(f"Output file: {result['file_name']}")
+
 
 def show_menu():
     """
@@ -274,7 +287,8 @@ def show_menu():
         print("7. Show order statistics")
         print("8. Update order status")
         print("9. Delete order by code")
-        print("10. Exit")
+        print("10. Export database orders to CSV")
+        print("11. Exit")
 
         choice = input("\nChoose an option: ")
 
@@ -297,7 +311,9 @@ def show_menu():
         elif choice == "9":
             delete_order_by_code_cli()
         elif choice == "10":
+            export_database_orders_cli()
+        elif choice == "11":   
             print("Goodbye!")
             break
         else:
-            print("Invalid option. Please choose a number from 1 to 10.")
+            print("Invalid option. Please choose a number from 1 to 11.")
