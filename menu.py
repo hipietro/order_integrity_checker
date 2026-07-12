@@ -1,26 +1,34 @@
-from csv_manager import clear_csv_orders
-from database import (
-    delete_order_by_code,
-    insert_order_into_database,
-    search_order_by_code,
-    show_database_orders,
-    show_order_statistics,
+from config import REPORT_FILE_NAME
+from services import (
+    clear_csv_input,
+    create_order,
+    delete_order,
+    get_database_orders,
+    get_statistics,
+    import_csv_orders,
+    preview_csv_import,
+    search_order,
     update_order_status
 )
-from validator import (
-    generate_invalid_orders_report,
-    show_invalid_orders,
-    validate_all_csv_orders,
-    validate_order
-)
-from normalizer import normalize_order
+
+
+def print_order(order):
+    """
+    Prints a single order in a readable format.
+    """
+
+    print(
+        f"ID: {order['id']} | "
+        f"Code: {order['order_code']} | "
+        f"Customer: {order['customer_name']} | "
+        f"Quantity: {order['quantity']} | "
+        f"Status: {order['status']}"
+    )
+
 
 def show_validation_problems(validation_results):
     """
     Shows invalid orders from already calculated validation results.
-
-    This function is used during the import confirmation flow, so the user can
-    inspect validation problems before deciding whether to continue or cancel.
     """
 
     found_invalid_orders = False
@@ -47,23 +55,17 @@ def show_validation_problems(validation_results):
     if not found_invalid_orders:
         print("No invalid orders found.")
 
-def import_valid_orders():
+
+def import_valid_orders_cli():
     """
-    Validates all CSV orders, asks for confirmation, saves only valid orders into
-    the database, generates a report for invalid orders, and clears the CSV file
-    after the import is completed.
+    Handles the CSV import flow from the command-line interface.
     """
 
-    validation_results = validate_all_csv_orders()
+    preview = preview_csv_import()
 
-    valid_orders = 0
-    invalid_orders = 0
-
-    for result in validation_results:
-        if len(result["errors"]) == 0:
-            valid_orders = valid_orders + 1
-        else:
-            invalid_orders = invalid_orders + 1
+    validation_results = preview["validation_results"]
+    valid_orders = preview["valid_orders"]
+    invalid_orders = preview["invalid_orders"]
 
     print("\nIMPORT CHECK")
     print("------------")
@@ -81,31 +83,23 @@ def import_valid_orders():
             return
 
         elif choice == "y":
-            saved_orders = 0
+            result = import_csv_orders(validation_results)
 
             print("\nIMPORT RESULT")
             print("-------------")
 
-            for result in validation_results:
-                order = result["order"]
-                errors = result["errors"]
-                order_code = order["order_code"]
+            for order in result["saved_orders"]:
+                print(f"{order['order_code']}: saved into database")
 
-                if len(errors) == 0:
-                    insert_order_into_database(order)
-                    saved_orders = saved_orders + 1
-                    print(f"{order_code}: saved into database")
-                else:
-                    print(f"{order_code}: NOT saved. Check the invalid orders report for details.")
-
-            generate_invalid_orders_report(validation_results)
-            clear_csv_orders()
+            for skipped_order in result["skipped_orders"]:
+                order = skipped_order["order"]
+                print(f"{order['order_code']}: NOT saved. Check the invalid orders report for details.")
 
             print("\nSUMMARY")
             print("-------")
-            print(f"Saved orders: {saved_orders}")
-            print(f"Invalid orders: {invalid_orders}")
-            print("Invalid orders report generated: invalid_orders_report.txt")
+            print(f"Saved orders: {len(result['saved_orders'])}")
+            print(f"Invalid orders: {len(result['skipped_orders'])}")
+            print(f"Invalid orders report generated: {REPORT_FILE_NAME}")
             print("CSV file cleared after import.")
 
             return
@@ -113,40 +107,154 @@ def import_valid_orders():
         else:
             print("Invalid option. Please choose y, n, or w.")
 
-def insert_order_manually():
-    """
-    Allows the user to insert a new order manually through the command line.
 
-    The function prompts the user for each field of the order, validates the input,
-    and if the order is valid, it is saved into the database.
+def show_invalid_orders_cli():
+    """
+    Shows invalid CSV orders from the command-line interface.
+    """
+
+    preview = preview_csv_import()
+    show_validation_problems(preview["validation_results"])
+
+
+def show_database_orders_cli():
+    """
+    Shows all database orders from the command-line interface.
+    """
+
+    orders = get_database_orders()
+
+    print("\nDATABASE ORDERS")
+    print("---------------")
+
+    if len(orders) == 0:
+        print("No orders found in the database.")
+        return
+
+    for order in orders:
+        print_order(order)
+
+
+def clear_csv_orders_cli():
+    """
+    Clears the CSV input file from the command-line interface.
+    """
+
+    result = clear_csv_input()
+    print(result["message"])
+
+
+def search_order_by_code_cli():
+    """
+    Searches an order from the command-line interface.
+    """
+
+    order_code = input("Enter order code to search: ")
+
+    order = search_order(order_code)
+
+    print("\nSEARCH RESULT")
+    print("-------------")
+
+    if order is None:
+        print(f"No order found with code {order_code}.")
+    else:
+        print_order(order)
+
+
+def insert_order_manually_cli():
+    """
+    Inserts an order manually from the command-line interface.
     """
 
     print("\nINSERT NEW ORDER")
     print("----------------")
 
-    order_code = input("Order code: ")
-    customer_name = input("Customer name: ")
-    quantity = input("Quantity: ")
-    status = input("Status (completed, pending, cancelled): ")
-
     order = {
-        "order_code": order_code,
-        "customer_name": customer_name,
-        "quantity": quantity,
-        "status": status
+        "order_code": input("Order code: "),
+        "customer_name": input("Customer name: "),
+        "quantity": input("Quantity: "),
+        "status": input("Status (completed, pending, cancelled): ")
     }
 
-    order = normalize_order(order)
+    result = create_order(order)
 
-    errors = validate_order(order, [])
-
-    if len(errors) == 0:
-        insert_order_into_database(order)
-        print(f"Order {order_code} inserted successfully.")
+    if result["success"]:
+        inserted_order = result["order"]
+        print(f"Order {inserted_order['order_code']} inserted successfully.")
     else:
-        print(f"Order {order_code} is invalid. Errors:")
-        for error in errors:
+        invalid_order = result["order"]
+        print(f"Order {invalid_order['order_code']} is invalid. Errors:")
+
+        for error in result["errors"]:
             print(f"- {error}")
+
+
+def show_order_statistics_cli():
+    """
+    Shows order statistics from the command-line interface.
+    """
+
+    statistics = get_statistics()
+
+    print("\nORDER STATISTICS")
+    print("----------------")
+    print(f"Completed orders: {statistics['completed']}")
+    print(f"Pending orders: {statistics['pending']}")
+    print(f"Cancelled orders: {statistics['cancelled']}")
+    print(f"Total orders: {statistics['total']}")
+
+
+def update_order_status_cli():
+    """
+    Updates an order status from the command-line interface.
+    """
+
+    order_code = input("Enter order code to update: ")
+
+    order = search_order(order_code)
+
+    if order is None:
+        print(f"No order found with code {order_code}.")
+        return
+
+    print("\nORDER FOUND")
+    print("-----------")
+    print_order(order)
+
+    new_status = input("Enter new status (completed, pending, cancelled): ")
+
+    result = update_order_status(order_code, new_status)
+
+    print(result["message"])
+
+
+def delete_order_by_code_cli():
+    """
+    Deletes an order from the command-line interface.
+    """
+
+    order_code = input("Enter order code to delete: ")
+
+    order = search_order(order_code)
+
+    if order is None:
+        print(f"No order found with code {order_code}.")
+        return
+
+    print("\nORDER FOUND")
+    print("-----------")
+    print_order(order)
+
+    confirmation = input("Are you sure you want to delete this order? y/n: ")
+
+    if confirmation != "y":
+        print("Delete cancelled.")
+        return
+
+    result = delete_order(order_code)
+
+    print(result["message"])
 
 
 def show_menu():
@@ -171,23 +279,23 @@ def show_menu():
         choice = input("\nChoose an option: ")
 
         if choice == "1":
-            import_valid_orders()
+            import_valid_orders_cli()
         elif choice == "2":
-            show_invalid_orders()
+            show_invalid_orders_cli()
         elif choice == "3":
-            show_database_orders()
+            show_database_orders_cli()
         elif choice == "4":
-            clear_csv_orders()
+            clear_csv_orders_cli()
         elif choice == "5":
-            search_order_by_code()
+            search_order_by_code_cli()
         elif choice == "6":
-            insert_order_manually()
+            insert_order_manually_cli()
         elif choice == "7":
-            show_order_statistics()
+            show_order_statistics_cli()
         elif choice == "8":
-            update_order_status()
+            update_order_status_cli()
         elif choice == "9":
-            delete_order_by_code()
+            delete_order_by_code_cli()
         elif choice == "10":
             print("Goodbye!")
             break

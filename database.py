@@ -3,13 +3,10 @@ import sqlite3
 from config import DATABASE_NAME, VALID_STATUSES
 from normalizer import normalize_order, normalize_order_code, normalize_status
 
+
 def create_database():
     """
     Creates the SQLite database and the orders table if they do not already exist.
-
-    The orders table represents the orders that are already stored in the company's
-    internal system. New imported orders will be checked against this table to avoid
-    duplicate order codes.
     """
 
     connection = sqlite3.connect(DATABASE_NAME)
@@ -32,9 +29,6 @@ def create_database():
 def insert_sample_orders():
     """
     Inserts a few sample orders into the database.
-
-    These records simulate orders that already exist in the company's internal
-    system before importing a new CSV file.
     """
 
     connection = sqlite3.connect(DATABASE_NAME)
@@ -55,63 +49,25 @@ def insert_sample_orders():
     connection.close()
 
 
-def order_exists_in_database(order_code):
+def row_to_order(row):
     """
-    Checks whether an order code already exists in the SQLite database.
+    Converts a database row into a dictionary.
 
-    Parameters:
-        order_code: the business identifier of the order.
-
-    Returns:
-        True if the order code already exists in the database.
-        False otherwise.
-    """
-    order_code = normalize_order_code(order_code)
-
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        SELECT order_code
-        FROM orders
-        WHERE order_code = ?
-    """, (order_code,))
-
-    result = cursor.fetchone()
-
-    connection.close()
-
-    return result is not None
-
-
-def insert_order_into_database(order):
-    """
-    Inserts a valid order into the SQLite database.
-
-    This function is called only after the order has passed all validation checks.
+    This makes database results easier to reuse in both CLI and future GUI code.
     """
 
-    order = normalize_order(order)
+    return {
+        "id": row[0],
+        "order_code": row[1],
+        "customer_name": row[2],
+        "quantity": row[3],
+        "status": row[4]
+    }
 
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
 
-    cursor.execute("""
-        INSERT INTO orders (order_code, customer_name, quantity, status)
-        VALUES (?, ?, ?, ?)
-    """, (
-        order["order_code"],
-        order["customer_name"],
-        int(order["quantity"]),
-        order["status"]
-    ))
-
-    connection.commit()
-    connection.close()
-
-def show_database_orders():
+def get_all_orders():
     """
-    Prints all orders currently stored in the SQLite database.
+    Returns all orders stored in the database.
     """
 
     connection = sqlite3.connect(DATABASE_NAME)
@@ -123,35 +79,27 @@ def show_database_orders():
         ORDER BY id
     """)
 
-    orders = cursor.fetchall()
+    rows = cursor.fetchall()
 
     connection.close()
 
-    print("\nDATABASE ORDERS")
-    print("---------------")
+    orders = []
 
-    if len(orders) == 0:
-        print("No orders found in the database.")
-    else:
-        for order in orders:
-            print(
-                f"ID: {order[0]} | "
-                f"Code: {order[1]} | "
-                f"Customer: {order[2]} | "
-                f"Quantity: {order[3]} | "
-                f"Status: {order[4]}"
-            )
+    for row in rows:
+        orders.append(row_to_order(row))
+
+    return orders
 
 
-def search_order_by_code():
+def get_order_by_code(order_code):
     """
-    Searches for an order in the SQLite database using its order code.
+    Returns one order by order code.
 
-    The function asks the user to type an order code, then searches the database
-    and prints the matching order if it exists.
+    If no order is found, returns None.
     """
 
-    order_code = normalize_order_code(input("Enter order code to search: "))
+    normalized_code = normalize_order_code(order_code)
+
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -159,33 +107,53 @@ def search_order_by_code():
         SELECT id, order_code, customer_name, quantity, status
         FROM orders
         WHERE order_code = ?
-    """, (order_code,))
+    """, (normalized_code,))
 
-    order = cursor.fetchone()
+    row = cursor.fetchone()
 
     connection.close()
 
-    print("\nSEARCH RESULT")
-    print("-------------")
+    if row is None:
+        return None
 
-    if order is None:
-        print(f"No order found with code {order_code}.")
-    else:
-        print(
-            f"ID: {order[0]} | "
-            f"Code: {order[1]} | "
-            f"Customer: {order[2]} | "
-            f"Quantity: {order[3]} | "
-            f"Status: {order[4]}"
-        )
+    return row_to_order(row)
 
 
-def show_order_statistics():
+def order_exists_in_database(order_code):
     """
-    Shows statistics about the orders stored in the database.
+    Checks whether an order code already exists in the SQLite database.
+    """
 
-    The function counts how many orders exist for each status:
-    completed, pending, and cancelled.
+    return get_order_by_code(order_code) is not None
+
+
+def insert_order_into_database(order):
+    """
+    Inserts a valid order into the SQLite database.
+    """
+
+    normalized_order = normalize_order(order)
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO orders (order_code, customer_name, quantity, status)
+        VALUES (?, ?, ?, ?)
+    """, (
+        normalized_order["order_code"],
+        normalized_order["customer_name"],
+        int(normalized_order["quantity"]),
+        normalized_order["status"]
+    ))
+
+    connection.commit()
+    connection.close()
+
+
+def get_order_statistics():
+    """
+    Returns statistics about the orders stored in the database.
     """
 
     connection = sqlite3.connect(DATABASE_NAME)
@@ -197,7 +165,7 @@ def show_order_statistics():
         GROUP BY status
     """)
 
-    results = cursor.fetchall()
+    rows = cursor.fetchall()
 
     connection.close()
 
@@ -207,117 +175,56 @@ def show_order_statistics():
         "cancelled": 0
     }
 
-    for result in results:
-        status = result[0]
-        count = result[1]
+    for row in rows:
+        status = row[0]
+        count = row[1]
 
         statistics[status] = count
 
-    print("\nORDER STATISTICS")
-    print("----------------")
-    print(f"Completed orders: {statistics['completed']}")
-    print(f"Pending orders: {statistics['pending']}")
-    print(f"Cancelled orders: {statistics['cancelled']}")
-    print(f"Total orders: {sum(statistics.values())}")
+    statistics["total"] = sum(statistics.values())
+
+    return statistics
 
 
-def update_order_status():
+def update_order_status_in_database(order_code, new_status):
     """
-    Updates the status of an existing order in the SQLite database.
+    Updates the status of an existing order.
 
-    The function asks the user for an order code, checks if the order exists,
-    then asks for a new status and updates the database if the status is valid.
+    Returns True if an order was updated, False otherwise.
     """
 
-    order_code = normalize_order_code(input("Enter order code to update: "))
+    normalized_code = normalize_order_code(order_code)
+    normalized_status = normalize_status(new_status)
+
+    if normalized_status not in VALID_STATUSES:
+        return False
+
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
-
-    cursor.execute("""
-        SELECT id, order_code, customer_name, quantity, status
-        FROM orders
-        WHERE order_code = ?
-    """, (order_code,))
-
-    order = cursor.fetchone()
-
-    if order is None:
-        connection.close()
-        print(f"No order found with code {order_code}.")
-        return
-
-    print("\nORDER FOUND")
-    print("-----------")
-    print(
-        f"ID: {order[0]} | "
-        f"Code: {order[1]} | "
-        f"Customer: {order[2]} | "
-        f"Quantity: {order[3]} | "
-        f"Current status: {order[4]}"
-    )
-
-    new_status = normalize_status(input("Enter new status (completed, pending, cancelled): "))
-    if new_status not in VALID_STATUSES:
-        connection.close()
-        print(f"Invalid status. Accepted values are: {', '.join(VALID_STATUSES)}")
-        return
 
     cursor.execute("""
         UPDATE orders
         SET status = ?
         WHERE order_code = ?
-    """, (new_status, order_code))
+    """, (normalized_status, normalized_code))
 
     connection.commit()
-    connection.close()
 
-    print(f"Order {order_code} updated successfully.")
-
-def delete_order_by_code():
-    """
-    Deletes an order from the SQLite database using its order code.
-
-    The function asks the user for an order code, shows the matching order if it
-    exists, and asks for confirmation before deleting it.
-    """
-
-    order_code = normalize_order_code(input("Enter order code to delete: "))
-    if order_code == "":
-        print("Order code cannot be empty.")
-        return
-
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-
-    cursor.execute("""
-        SELECT id, order_code, customer_name, quantity, status
-        FROM orders
-        WHERE order_code = ?
-    """, (order_code,))
-
-    order = cursor.fetchone()
+    updated_rows = cursor.rowcount
 
     connection.close()
 
-    if order is None:
-        print(f"No order found with code {order_code}.")
-        return
+    return updated_rows > 0
 
-    print("\nORDER FOUND")
-    print("-----------")
-    print(
-        f"ID: {order[0]} | "
-        f"Code: {order[1]} | "
-        f"Customer: {order[2]} | "
-        f"Quantity: {order[3]} | "
-        f"Status: {order[4]}"
-    )
 
-    confirmation = input("Are you sure you want to delete this order? y/n: ")
+def delete_order_from_database(order_code):
+    """
+    Deletes an order from the database.
 
-    if confirmation != "y":
-        print("Delete cancelled.")
-        return
+    Returns True if an order was deleted, False otherwise.
+    """
+
+    normalized_code = normalize_order_code(order_code)
 
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
@@ -325,9 +232,12 @@ def delete_order_by_code():
     cursor.execute("""
         DELETE FROM orders
         WHERE order_code = ?
-    """, (order_code,))
+    """, (normalized_code,))
 
     connection.commit()
+
+    deleted_rows = cursor.rowcount
+
     connection.close()
 
-    print(f"Order {order_code} deleted successfully.")
+    return deleted_rows > 0
