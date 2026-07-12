@@ -12,6 +12,73 @@ from services import (
     update_order_status
 )
 
+def normalize_cli_choice(choice):
+    """
+    Normalizes a CLI choice by removing spaces and converting it to lowercase.
+    """
+
+    return choice.strip().lower()
+
+
+def ask_confirmation(message):
+    """
+    Asks the user for a y/n confirmation.
+
+    The answer is case-insensitive, so Y/y/N/n are all accepted.
+    """
+
+    while True:
+        choice = normalize_cli_choice(input(f"{message} y/n: "))
+
+        if choice == "y":
+            return True
+
+        if choice == "n":
+            return False
+
+        if choice == "":
+            print("Confirmation cannot be empty. Please choose y or n.")
+        else:
+            print("Invalid confirmation. Please choose y or n.")
+
+
+def ask_import_choice():
+    """
+    Asks the user what to do after the CSV import preview.
+
+    Accepted choices:
+    - y: confirm import
+    - n: cancel import
+    - w: show validation problems
+    """
+
+    while True:
+        choice = normalize_cli_choice(
+            input("\nChoose: y = import, n = cancel, w = show problems: ")
+        )
+
+        if choice in ["y", "n", "w"]:
+            return choice
+
+        if choice == "":
+            print("Choice cannot be empty. Please choose y, n, or w.")
+        else:
+            print("Invalid option. Please choose y, n, or w.")
+
+
+def read_menu_choice():
+    """
+    Reads and normalizes the main menu choice.
+    """
+
+    choice = input("\nChoose an option: ").strip()
+
+    if choice == "":
+        print("Menu choice cannot be empty.")
+        return ""
+
+    return choice
+
 
 def print_order(order):
     """
@@ -73,8 +140,10 @@ def import_valid_orders_cli():
     print(f"Valid orders ready to import: {valid_orders}")
     print(f"Invalid orders found: {invalid_orders}")
 
+    print("\nIf you confirm, valid orders will be imported and the CSV file will be cleared.")
+
     while True:
-        choice = input("\nChoose: y = import, n = cancel, w = show problems: ")
+        choice = ask_import_choice()
 
         if choice == "w":
             show_validation_problems(validation_results)
@@ -140,6 +209,14 @@ def clear_csv_orders_cli():
     """
     Clears the CSV input file from the command-line interface.
     """
+
+    confirmed = ask_confirmation(
+        "Are you sure you want to clear new_orders.csv? This action cannot be undone."
+    )
+
+    if not confirmed:
+        print("Clear CSV cancelled.")
+        return
 
     result = clear_csv_input()
     print(result["message"])
@@ -247,9 +324,9 @@ def delete_order_by_code_cli():
     print("-----------")
     print_order(order)
 
-    confirmation = input("Are you sure you want to delete this order? y/n: ")
+    confirmed = ask_confirmation("Are you sure you want to delete this order?")
 
-    if confirmation != "y":
+    if not confirmed:
         print("Delete cancelled.")
         return
 
@@ -290,7 +367,10 @@ def show_menu():
         print("10. Export database orders to CSV")
         print("11. Exit")
 
-        choice = input("\nChoose an option: ")
+        choice = read_menu_choice()
+
+        if choice == "":
+            continue
 
         if choice == "1":
             import_valid_orders_cli()
