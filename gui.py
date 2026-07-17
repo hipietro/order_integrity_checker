@@ -6,7 +6,8 @@ from services import (
     get_database_orders,
     get_statistics,
     import_csv_orders,
-    preview_csv_import
+    preview_csv_import,
+    search_order
 )
 
 
@@ -36,6 +37,29 @@ class OrderIntegrityCheckerGUI:
             font=("Arial", 20, "bold")
         )
         title_label.pack(pady=10)
+
+        search_frame = tk.Frame(self.root)
+        search_frame.pack(pady=10)
+
+        search_label = tk.Label(
+            search_frame,
+            text="Search order code:"
+        )
+        search_label.grid(row=0, column=0, padx=5)
+
+        self.search_entry = tk.Entry(
+            search_frame,
+            width=25
+        )
+        self.search_entry.grid(row=0, column=1, padx=5)
+
+        search_button = tk.Button(
+            search_frame,
+            text="Search",
+            width=15,
+            command=self.search_order_by_code
+        )
+        search_button.grid(row=0, column=2, padx=5)
 
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
@@ -181,6 +205,39 @@ class OrderIntegrityCheckerGUI:
             "Import completed",
             "CSV import completed successfully."
         )
+
+    def search_order_by_code(self):
+        """
+        Searches a database order by order code.
+        """
+
+        order_code = self.search_entry.get()
+
+        self.clear_output()
+
+        if order_code.strip() == "":
+            messagebox.showwarning(
+                "Search order",
+                "Please enter an order code."
+            )
+            return
+
+        order = search_order(order_code)
+
+        self.write_output("SEARCH RESULT")
+        self.write_output("-------------")
+
+        if order is None:
+            self.write_output("No order found with the provided code.")
+            return
+
+        self.write_output(f"ID: {order['id']}")
+        self.write_output(f"Code: {order['order_code']}")
+        self.write_output(f"Customer: {order['customer_name']}")
+        self.write_output(f"Quantity: {order['quantity']}")
+        self.write_output(f"Status: {order['status']}")
+        self.write_output("")
+        self.write_output("The order code is normalized automatically before searching.")
 
     def show_statistics(self):
         """
