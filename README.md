@@ -1,69 +1,111 @@
 # Order Integrity Checker
 
-Order Integrity Checker is a small Python command-line project that validates business orders imported from a CSV file and checks whether the same order codes already exist in a local SQLite database.
+![Run tests](https://github.com/hipietro/order_integrity_checker/actions/workflows/tests.yml/badge.svg)
 
-The goal of this project is to simulate a simple data validation workflow that could happen in a company before importing external order data into an internal system.
+Order Integrity Checker is a small Python application that validates, imports, manages, and exports business orders stored in a local SQLite database.
+
+The project simulates a realistic internal data-quality workflow: before external CSV orders are accepted into a company system, they are normalized, validated, checked for duplicates, and either imported or reported as invalid.
 
 ## Why this project
 
-This project was created while learning Python fundamentals.
+This project was created as a practical Python portfolio project.
 
-It is intentionally simple, but it tries to solve a realistic problem: checking the quality of imported business data before accepting it into a system.
+It is intentionally simple, but it focuses on realistic software development concepts:
 
-The project currently focuses on:
+- input validation
+- CSV processing
+- SQLite persistence
+- service-layer separation
+- CLI interaction
+- Tkinter GUI prototype
+- automated unit testing
+- GitHub Actions CI
 
-* reading structured data from a CSV file
-* checking duplicated order codes
-* validating required fields
-* validating quantities and statuses
-* printing a clear validation summary
+## Features
+
+- Import orders from `new_orders.csv`
+- Validate required fields
+- Detect duplicated order codes inside the CSV file
+- Detect orders already existing in the database
+- Normalize order codes and statuses
+- Save valid orders into SQLite
+- Skip invalid orders and generate a report
+- Search orders by code
+- Insert orders manually
+- Update order status
+- Delete orders
+- Export database orders to CSV
+- Use the project from both CLI and GUI
+- Run automated tests locally and on GitHub Actions
 
 ## Technologies used
 
-* Python
-* CSV
-* SQLite
+- Python
+- SQLite
+- CSV
+- Tkinter
+- unittest
+- GitHub Actions
 
-No external libraries are required.
+No external Python libraries are required.
 
 ## Project structure
 
 ```text
 order_integrity_checker/
 │
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_services.py
+│   └── test_validator.py
+│
+├── config.py
+├── csv_manager.py
+├── database.py
+├── gui.py
 ├── main.py
+├── menu.py
 ├── new_orders.csv
+├── normalizer.py
+├── services.py
+├── validator.py
 ├── README.md
 └── .gitignore
 ```
 
-The SQLite database file `orders.db` is generated automatically when the program runs.
+Generated files such as `orders.db`, `invalid_orders_report.txt`, and `exported_orders.csv` are ignored by Git.
 
 ## How it works
 
-The program follows these steps:
+The application follows this workflow:
 
 1. Creates a local SQLite database if it does not already exist.
-2. Creates an `orders` table.
-3. Inserts a few sample orders into the database.
-4. Reads new orders from `new_orders.csv`.
-5. Validates each order.
-6. Prints all detected errors.
-7. Prints a final summary.
+2. Reads orders from `new_orders.csv`.
+3. Normalizes order data.
+4. Validates each order.
+5. Imports only valid orders.
+6. Skips invalid orders.
+7. Generates an invalid orders report.
+8. Allows the user to manage database orders from the CLI or GUI.
+9. Allows exporting database orders to CSV.
 
 ## Validation rules
 
 An order is considered invalid if:
 
-* the order code is missing
-* the order code already exists in the database
-* the order code is duplicated inside the CSV file
-* the customer name is missing
-* the customer name is too short
-* the quantity is missing
-* the quantity is less than or equal to zero
-* the status is not supported
-* the quantity is not a valid number
+- the order code is missing
+- the order code already exists in the database
+- the order code is duplicated inside the CSV file
+- the customer name is missing
+- the customer name is too short
+- the quantity is missing
+- the quantity is not a valid number
+- the quantity is less than or equal to zero
+- the status is not supported
 
 Supported statuses are:
 
@@ -85,76 +127,40 @@ ORD006,Sara Neri,7,unknown
 ORD003,Paolo Gialli,4,completed
 ```
 
-## Example output
-
-```text
-ORDER INTEGRITY CHECKER
------------------------
-
-Checking order: ORD001
-Result: invalid order
-- order code already exists in database
-
-Checking order: ORD003
-Result: valid order
-
-Checking order: ORD004
-Result: invalid order
-- missing customer name
-
-Checking order: ORD005
-Result: invalid order
-- quantity must be greater than zero
-
-Checking order: ORD006
-Result: invalid order
-- invalid status
-
-Checking order: ORD003
-Result: invalid order
-- duplicated order code inside CSV file
-
-SUMMARY
--------
-Valid orders: 1
-Invalid orders: 5
-```
-
-## How to run
-
-Clone the repository and run:
+## How to run the CLI
 
 ```bash
 python3 main.py
 ```
 
-The program will automatically create the SQLite database file if it does not already exist.
+The CLI opens an interactive menu that allows importing, searching, updating, deleting, exporting, and inspecting orders.
 
-## Current limitations
+## How to run the GUI
 
-This is an early version of the project.
+```bash
+python3 gui.py
+```
 
-At the moment:
+The GUI is built with Tkinter and reuses the same service layer used by the CLI.
 
-* valid orders are checked but not inserted into the database
-* the program only supports CSV input
-* the code is still contained in a single Python file
-* no report file is generated yet
+## How to run tests
 
-These limitations are intentional because the project is being developed step by step.
+```bash
+python3 -m unittest discover -s tests -v
+```
 
-## Roadmap
+The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, and CSV export behavior.
 
-Planned improvements:
+## Continuous integration
 
-* save valid orders into the database
-* add JSON input support
-* generate a validation report file
-* improve error handling
-* split the code into multiple Python modules
-* add command-line options
-* add automated tests
+This repository includes a GitHub Actions workflow that runs the unit tests automatically on every push and pull request.
+
+Workflow file:
+
+```text
+.github/workflows/tests.yml
+```
 
 ## Purpose
 
-This project is part of my Python learning path and is designed to practice basic programming concepts while building something close to a real-world business scenario.
+This project is part of my Python learning path and is designed to practice real-world software development habits while building something close to a business data-validation tool.
