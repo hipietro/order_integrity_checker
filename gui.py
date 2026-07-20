@@ -9,7 +9,8 @@ from services import (
     get_statistics,
     import_csv_orders,
     preview_csv_import,
-    search_order
+    search_order,
+    update_order_status
 )
 
 
@@ -133,6 +134,49 @@ class OrderIntegrityCheckerGUI:
         )
         create_button.grid(row=2, column=0, columnspan=4, padx=5, pady=10)
 
+        update_frame = tk.LabelFrame(
+            self.root,
+            text="Update order status"
+        )
+        update_frame.pack(pady=10, padx=10, fill="x")
+
+        update_code_label = tk.Label(
+            update_frame,
+            text="Order code:"
+        )
+        update_code_label.grid(row=0, column=0, padx=5, pady=5)
+
+        self.update_order_code_entry = tk.Entry(
+            update_frame,
+            width=25
+        )
+        self.update_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        update_status_label = tk.Label(
+            update_frame,
+            text="New status:"
+        )
+        update_status_label.grid(row=0, column=2, padx=5, pady=5)
+
+        self.update_status_value = tk.StringVar(self.root)
+        self.update_status_value.set("pending")
+
+        update_status_menu = tk.OptionMenu(
+            update_frame,
+            self.update_status_value,
+            *VALID_STATUSES
+        )
+        update_status_menu.config(width=18)
+        update_status_menu.grid(row=0, column=3, padx=5, pady=5)
+
+        update_button = tk.Button(
+            update_frame,
+            text="Update status",
+            width=20,
+            command=self.update_order_status_from_form
+        )
+        update_button.grid(row=0, column=4, padx=5, pady=5)
+
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
 
@@ -249,6 +293,43 @@ class OrderIntegrityCheckerGUI:
             "Create order",
             "Order could not be created. Check the validation errors."
         )
+
+    def update_order_status_from_form(self):
+        """
+        Updates an order status using the existing service layer.
+        """
+
+        order_code = self.update_order_code_entry.get()
+        new_status = self.update_status_value.get()
+
+        self.clear_output()
+
+        if order_code.strip() == "":
+            messagebox.showwarning(
+                "Update order status",
+                "Please enter an order code."
+            )
+            return
+
+        result = update_order_status(order_code, new_status)
+
+        self.write_output("UPDATE STATUS RESULT")
+        self.write_output("--------------------")
+        self.write_output(result["message"])
+
+        if result["success"]:
+            self.update_order_code_entry.delete(0, tk.END)
+            self.update_status_value.set("pending")
+
+            messagebox.showinfo(
+                "Update order status",
+                result["message"]
+            )
+        else:
+            messagebox.showwarning(
+                "Update order status",
+                result["message"]
+            )
 
     def show_database_orders(self):
         """
