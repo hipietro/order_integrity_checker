@@ -1,8 +1,10 @@
 import tkinter as tk
 from tkinter import messagebox
 
+from config import VALID_STATUSES
 from database import create_database, insert_sample_orders
 from services import (
+    create_order,
     get_database_orders,
     get_statistics,
     import_csv_orders,
@@ -22,7 +24,7 @@ class OrderIntegrityCheckerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Order Integrity Checker")
-        self.root.geometry("900x600")
+        self.root.geometry("1000x700")
 
         self.create_widgets()
 
@@ -38,20 +40,23 @@ class OrderIntegrityCheckerGUI:
         )
         title_label.pack(pady=10)
 
-        search_frame = tk.Frame(self.root)
-        search_frame.pack(pady=10)
+        search_frame = tk.LabelFrame(
+            self.root,
+            text="Search order"
+        )
+        search_frame.pack(pady=10, padx=10, fill="x")
 
         search_label = tk.Label(
             search_frame,
-            text="Search order code:"
+            text="Order code:"
         )
-        search_label.grid(row=0, column=0, padx=5)
+        search_label.grid(row=0, column=0, padx=5, pady=5)
 
         self.search_entry = tk.Entry(
             search_frame,
             width=25
         )
-        self.search_entry.grid(row=0, column=1, padx=5)
+        self.search_entry.grid(row=0, column=1, padx=5, pady=5)
 
         search_button = tk.Button(
             search_frame,
@@ -59,7 +64,74 @@ class OrderIntegrityCheckerGUI:
             width=15,
             command=self.search_order_by_code
         )
-        search_button.grid(row=0, column=2, padx=5)
+        search_button.grid(row=0, column=2, padx=5, pady=5)
+
+        create_frame = tk.LabelFrame(
+            self.root,
+            text="Create order"
+        )
+        create_frame.pack(pady=10, padx=10, fill="x")
+
+        order_code_label = tk.Label(
+            create_frame,
+            text="Order code:"
+        )
+        order_code_label.grid(row=0, column=0, padx=5, pady=5)
+
+        self.create_order_code_entry = tk.Entry(
+            create_frame,
+            width=20
+        )
+        self.create_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        customer_name_label = tk.Label(
+            create_frame,
+            text="Customer name:"
+        )
+        customer_name_label.grid(row=0, column=2, padx=5, pady=5)
+
+        self.create_customer_name_entry = tk.Entry(
+            create_frame,
+            width=25
+        )
+        self.create_customer_name_entry.grid(row=0, column=3, padx=5, pady=5)
+
+        quantity_label = tk.Label(
+            create_frame,
+            text="Quantity:"
+        )
+        quantity_label.grid(row=1, column=0, padx=5, pady=5)
+
+        self.create_quantity_entry = tk.Entry(
+            create_frame,
+            width=20
+        )
+        self.create_quantity_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        status_label = tk.Label(
+            create_frame,
+            text="Status:"
+        )
+        status_label.grid(row=1, column=2, padx=5, pady=5)
+
+        self.create_status_value = tk.StringVar(self.root)
+        self.create_status_value.set("pending")
+
+        status_menu = tk.OptionMenu(
+            create_frame,
+            self.create_status_value,
+            *VALID_STATUSES
+        )
+        status_menu.config(width=18)
+        status_menu.grid(row=1, column=3, padx=5, pady=5)
+
+        create_button = tk.Button(
+            create_frame,
+            text="Create order",
+            width=20,
+            command=self.create_order_from_form
+        )
+        create_button.grid(row=2, column=0, columnspan=4, padx=5, pady=10)
 
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
@@ -98,8 +170,8 @@ class OrderIntegrityCheckerGUI:
 
         self.output_text = tk.Text(
             self.root,
-            height=25,
-            width=105
+            height=20,
+            width=115
         )
         self.output_text.pack(padx=10, pady=10)
 
@@ -117,6 +189,66 @@ class OrderIntegrityCheckerGUI:
 
         self.output_text.insert(tk.END, text)
         self.output_text.insert(tk.END, "\n")
+
+    def clear_create_order_form(self):
+        """
+        Clears the create order form fields.
+        """
+
+        self.create_order_code_entry.delete(0, tk.END)
+        self.create_customer_name_entry.delete(0, tk.END)
+        self.create_quantity_entry.delete(0, tk.END)
+        self.create_status_value.set("pending")
+
+    def create_order_from_form(self):
+        """
+        Creates a new order using the existing service layer.
+        """
+
+        order = {
+            "order_code": self.create_order_code_entry.get(),
+            "customer_name": self.create_customer_name_entry.get(),
+            "quantity": self.create_quantity_entry.get(),
+            "status": self.create_status_value.get()
+        }
+
+        result = create_order(order)
+
+        self.clear_output()
+
+        self.write_output("CREATE ORDER RESULT")
+        self.write_output("-------------------")
+
+        if result["success"]:
+            created_order = result["order"]
+
+            self.write_output("Order created successfully.")
+            self.write_output("")
+            self.write_output(f"Code: {created_order['order_code']}")
+            self.write_output(f"Customer: {created_order['customer_name']}")
+            self.write_output(f"Quantity: {created_order['quantity']}")
+            self.write_output(f"Status: {created_order['status']}")
+
+            self.clear_create_order_form()
+
+            messagebox.showinfo(
+                "Create order",
+                "Order created successfully."
+            )
+
+            return
+
+        self.write_output("Order could not be created.")
+        self.write_output("")
+        self.write_output("Validation errors:")
+
+        for error in result["errors"]:
+            self.write_output(f"- {error}")
+
+        messagebox.showwarning(
+            "Create order",
+            "Order could not be created. Check the validation errors."
+        )
 
     def show_database_orders(self):
         """
