@@ -89,6 +89,20 @@ class TestOrderServices(unittest.TestCase):
         mock_get_order_by_code.assert_called_once_with("ORD001")
         mock_delete_order_from_database.assert_called_once_with("ORD001")
 
+    @patch("services.delete_order_from_database")
+    @patch("services.get_order_by_code", return_value=None)
+    def test_delete_order_returns_error_for_missing_order(
+        self,
+        mock_get_order_by_code,
+        mock_delete_order_from_database
+    ):
+        result = services.delete_order("missing")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["message"], "No order found with code MISSING.")
+        mock_get_order_by_code.assert_called_once_with("MISSING")
+        mock_delete_order_from_database.assert_not_called()
+
     @patch("services.get_all_orders")
     @patch("services.export_orders_to_csv", return_value=2)
     def test_export_database_orders_returns_export_summary(self, mock_export_orders_to_csv, mock_get_all_orders):
