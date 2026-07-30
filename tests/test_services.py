@@ -67,6 +67,28 @@ class TestOrderServices(unittest.TestCase):
         self.assertIn("invalid status", result["errors"])
         mock_insert_order.assert_not_called()
 
+    @patch("services.delete_order_from_database", return_value=True)
+    @patch("services.get_order_by_code")
+    def test_delete_order_returns_success_for_existing_order(
+        self,
+        mock_get_order_by_code,
+        mock_delete_order_from_database
+    ):
+        mock_get_order_by_code.return_value = {
+            "id": 1,
+            "order_code": "ORD001",
+            "customer_name": "Mario Rossi",
+            "quantity": 5,
+            "status": "pending"
+        }
+
+        result = services.delete_order(" ord001 ")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["message"], "Order ORD001 deleted successfully.")
+        mock_get_order_by_code.assert_called_once_with("ORD001")
+        mock_delete_order_from_database.assert_called_once_with("ORD001")
+
     @patch("services.get_all_orders")
     @patch("services.export_orders_to_csv", return_value=2)
     def test_export_database_orders_returns_export_summary(self, mock_export_orders_to_csv, mock_get_all_orders):
