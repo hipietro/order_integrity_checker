@@ -17,7 +17,7 @@ It is intentionally simple, but it focuses on realistic software development con
 - SQLite persistence
 - service-layer separation
 - CLI interaction
-- Tkinter GUI prototype
+- Tkinter GUI
 - automated unit testing
 - GitHub Actions CI
 
@@ -33,9 +33,9 @@ It is intentionally simple, but it focuses on realistic software development con
 - Search orders by code
 - Insert orders manually
 - Update order status
-- Delete orders
+- Delete orders safely from the CLI or GUI
+- Preview order details before confirming a GUI deletion
 - Export database orders to CSV
-- Use the project from both CLI and GUI
 - Run automated tests locally and on GitHub Actions
 
 ## Technologies used
@@ -57,6 +57,9 @@ order_integrity_checker/
 ├── .github/
 │   └── workflows/
 │       └── tests.yml
+│
+├── docs/
+│   └── gui_manual_test_checklist.md
 │
 ├── tests/
 │   ├── __init__.py
@@ -141,7 +144,11 @@ The CLI opens an interactive menu that allows importing, searching, updating, de
 python3 gui.py
 ```
 
-The GUI is built with Tkinter and reuses the same service layer used by the CLI.
+The Tkinter GUI reuses the same service layer used by the CLI. It supports searching, creating, updating, deleting, importing, and inspecting orders.
+
+Before deleting an order, the GUI displays its code, customer, quantity, and current status. The user must explicitly confirm the permanent deletion.
+
+A manual regression checklist is available in [`docs/gui_manual_test_checklist.md`](docs/gui_manual_test_checklist.md).
 
 ## How to run tests
 
@@ -149,7 +156,7 @@ The GUI is built with Tkinter and reuses the same service layer used by the CLI.
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, and CSV export behavior.
+The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order deletion, and CSV export behavior.
 
 ## Continuous integration
 
