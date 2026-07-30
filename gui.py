@@ -5,6 +5,7 @@ from config import VALID_STATUSES
 from database import create_database, insert_sample_orders
 from services import (
     create_order,
+    delete_order,
     get_database_orders,
     get_statistics,
     import_csv_orders,
@@ -16,16 +17,16 @@ from services import (
 
 class OrderIntegrityCheckerGUI:
     """
-    First graphical interface for the Order Integrity Checker project.
+    Graphical interface for the Order Integrity Checker project.
 
     The GUI uses the service layer and does not duplicate database,
-    CSV or validation logic.
+    CSV, normalization or validation logic.
     """
 
     def __init__(self, root):
         self.root = root
         self.root.title("Order Integrity Checker")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x800")
 
         self.create_widgets()
 
@@ -41,11 +42,23 @@ class OrderIntegrityCheckerGUI:
         )
         title_label.pack(pady=10)
 
+        self.create_search_section()
+        self.create_order_creation_section()
+        self.create_status_update_section()
+        self.create_order_deletion_section()
+        self.create_action_buttons()
+        self.create_output_area()
+
+    def create_search_section(self):
+        """
+        Creates the order search section.
+        """
+
         search_frame = tk.LabelFrame(
             self.root,
             text="Search order"
         )
-        search_frame.pack(pady=10, padx=10, fill="x")
+        search_frame.pack(pady=5, padx=10, fill="x")
 
         search_label = tk.Label(
             search_frame,
@@ -58,6 +71,10 @@ class OrderIntegrityCheckerGUI:
             width=25
         )
         self.search_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.search_entry.bind(
+            "<Return>",
+            lambda event: self.search_order_by_code()
+        )
 
         search_button = tk.Button(
             search_frame,
@@ -67,11 +84,16 @@ class OrderIntegrityCheckerGUI:
         )
         search_button.grid(row=0, column=2, padx=5, pady=5)
 
+    def create_order_creation_section(self):
+        """
+        Creates the manual order creation section.
+        """
+
         create_frame = tk.LabelFrame(
             self.root,
             text="Create order"
         )
-        create_frame.pack(pady=10, padx=10, fill="x")
+        create_frame.pack(pady=5, padx=10, fill="x")
 
         order_code_label = tk.Label(
             create_frame,
@@ -134,11 +156,16 @@ class OrderIntegrityCheckerGUI:
         )
         create_button.grid(row=2, column=0, columnspan=4, padx=5, pady=10)
 
+    def create_status_update_section(self):
+        """
+        Creates the order status update section.
+        """
+
         update_frame = tk.LabelFrame(
             self.root,
             text="Update order status"
         )
-        update_frame.pack(pady=10, padx=10, fill="x")
+        update_frame.pack(pady=5, padx=10, fill="x")
 
         update_code_label = tk.Label(
             update_frame,
@@ -177,6 +204,52 @@ class OrderIntegrityCheckerGUI:
         )
         update_button.grid(row=0, column=4, padx=5, pady=5)
 
+    def create_order_deletion_section(self):
+        """
+        Creates the safe order deletion section.
+        """
+
+        delete_frame = tk.LabelFrame(
+            self.root,
+            text="Delete order"
+        )
+        delete_frame.pack(pady=5, padx=10, fill="x")
+
+        delete_code_label = tk.Label(
+            delete_frame,
+            text="Order code:"
+        )
+        delete_code_label.grid(row=0, column=0, padx=5, pady=5)
+
+        self.delete_order_code_entry = tk.Entry(
+            delete_frame,
+            width=25
+        )
+        self.delete_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.delete_order_code_entry.bind(
+            "<Return>",
+            lambda event: self.delete_order_from_form()
+        )
+
+        delete_button = tk.Button(
+            delete_frame,
+            text="Delete order",
+            width=20,
+            command=self.delete_order_from_form
+        )
+        delete_button.grid(row=0, column=2, padx=5, pady=5)
+
+        warning_label = tk.Label(
+            delete_frame,
+            text="A confirmation preview is shown before permanent deletion."
+        )
+        warning_label.grid(row=0, column=3, padx=10, pady=5)
+
+    def create_action_buttons(self):
+        """
+        Creates buttons for common database and CSV actions.
+        """
+
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=10)
 
@@ -212,9 +285,14 @@ class OrderIntegrityCheckerGUI:
         )
         clear_output_button.grid(row=1, column=1, padx=5, pady=5)
 
+    def create_output_area(self):
+        """
+        Creates the text area used to display operation results.
+        """
+
         self.output_text = tk.Text(
             self.root,
-            height=20,
+            height=16,
             width=115
         )
         self.output_text.pack(padx=10, pady=10)
@@ -233,6 +311,7 @@ class OrderIntegrityCheckerGUI:
 
         self.output_text.insert(tk.END, text)
         self.output_text.insert(tk.END, "\n")
+        self.output_text.see(tk.END)
 
     def clear_create_order_form(self):
         """
@@ -259,7 +338,6 @@ class OrderIntegrityCheckerGUI:
         result = create_order(order)
 
         self.clear_output()
-
         self.write_output("CREATE ORDER RESULT")
         self.write_output("-------------------")
 
@@ -279,7 +357,6 @@ class OrderIntegrityCheckerGUI:
                 "Create order",
                 "Order created successfully."
             )
-
             return
 
         self.write_output("Order could not be created.")
@@ -328,6 +405,65 @@ class OrderIntegrityCheckerGUI:
         else:
             messagebox.showwarning(
                 "Update order status",
+                result["message"]
+            )
+
+    def delete_order_from_form(self):
+        """
+        Deletes an order after displaying a confirmation preview.
+        """
+
+        order_code = self.delete_order_code_entry.get()
+
+        self.clear_output()
+        self.write_output("DELETE ORDER RESULT")
+        self.write_output("-------------------")
+
+        if order_code.strip() == "":
+            self.write_output("No order code was provided.")
+            messagebox.showwarning(
+                "Delete order",
+                "Please enter an order code."
+            )
+            return
+
+        order = search_order(order_code)
+
+        if order is None:
+            self.write_output("No order found with the provided code.")
+            messagebox.showwarning(
+                "Delete order",
+                "No order found with the provided code."
+            )
+            return
+
+        confirmed = messagebox.askyesno(
+            "Confirm order deletion",
+            f"Delete order {order['order_code']}?\n\n"
+            f"Customer: {order['customer_name']}\n"
+            f"Quantity: {order['quantity']}\n"
+            f"Status: {order['status']}\n\n"
+            "This action cannot be undone."
+        )
+
+        if not confirmed:
+            self.write_output(f"Deletion of order {order['order_code']} cancelled.")
+            return
+
+        result = delete_order(order["order_code"])
+        self.write_output(result["message"])
+
+        if result["success"]:
+            self.delete_order_code_entry.delete(0, tk.END)
+            self.delete_order_code_entry.focus_set()
+
+            messagebox.showinfo(
+                "Delete order",
+                result["message"]
+            )
+        else:
+            messagebox.showwarning(
+                "Delete order",
                 result["message"]
             )
 
@@ -478,7 +614,7 @@ def main():
     insert_sample_orders()
 
     root = tk.Tk()
-    app = OrderIntegrityCheckerGUI(root)
+    OrderIntegrityCheckerGUI(root)
     root.mainloop()
 
 
