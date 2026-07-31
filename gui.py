@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, scrolledtext, ttk
 
 from config import VALID_STATUSES
 from database import create_database, insert_sample_orders
@@ -11,7 +11,20 @@ from services import (
     import_csv_orders,
     preview_csv_import,
     search_order,
-    update_order_status
+    update_order_status,
+)
+from ui_components import create_action_card, create_section
+from ui_config import (
+    BUTTON_WIDTH,
+    CONTROL_PADDING,
+    DEFAULT_STATUS,
+    ENTRY_WIDTH,
+    OUTER_PADDING,
+    OUTPUT_HEIGHT,
+    WINDOW_GEOMETRY,
+    WINDOW_MIN_HEIGHT,
+    WINDOW_MIN_WIDTH,
+    WINDOW_TITLE,
 )
 
 
@@ -19,320 +32,445 @@ class OrderIntegrityCheckerGUI:
     """
     Graphical interface for the Order Integrity Checker project.
 
-    The GUI uses the service layer and does not duplicate database,
-    CSV, normalization or validation logic.
+    The GUI delegates business operations to the service layer and keeps
+    database, CSV, normalization and validation logic outside the widgets.
     """
 
     def __init__(self, root):
         self.root = root
-        self.root.title("Order Integrity Checker")
-        self.root.geometry("1000x800")
+        self.root.title(WINDOW_TITLE)
+        self.root.geometry(WINDOW_GEOMETRY)
+        self.root.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
+        self.status_message = tk.StringVar(value="Ready")
         self.create_widgets()
 
     def create_widgets(self):
-        """
-        Creates the main GUI widgets.
-        """
+        """Creates the responsive application layout."""
 
-        title_label = tk.Label(
-            self.root,
-            text="Order Integrity Checker",
-            font=("Arial", 20, "bold")
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+
+        main_frame = ttk.Frame(self.root, padding=OUTER_PADDING)
+        main_frame.grid(row=0, column=0, sticky="nsew")
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=1)
+        main_frame.rowconfigure(3, weight=2)
+
+        header = ttk.Label(
+            main_frame,
+            text=WINDOW_TITLE,
+            font=("Arial", 20, "bold"),
         )
-        title_label.pack(pady=10)
+        header.grid(row=0, column=0, sticky="w", pady=(0, OUTER_PADDING))
 
-        self.create_search_section()
-        self.create_order_creation_section()
-        self.create_status_update_section()
-        self.create_order_deletion_section()
-        self.create_action_buttons()
-        self.create_output_area()
+        workspace = ttk.Frame(main_frame)
+        workspace.grid(row=1, column=0, sticky="nsew")
+        workspace.columnconfigure(0, weight=1, uniform="workspace")
+        workspace.columnconfigure(1, weight=1, uniform="workspace")
+        workspace.rowconfigure(0, weight=1)
 
-    def create_search_section(self):
-        """
-        Creates the order search section.
-        """
-
-        search_frame = tk.LabelFrame(
-            self.root,
-            text="Search order"
+        left_column = ttk.Frame(workspace)
+        left_column.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=(0, CONTROL_PADDING),
         )
-        search_frame.pack(pady=5, padx=10, fill="x")
+        left_column.columnconfigure(0, weight=1)
 
-        search_label = tk.Label(
-            search_frame,
-            text="Order code:"
+        right_column = ttk.Frame(workspace)
+        right_column.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=(CONTROL_PADDING, 0),
         )
-        search_label.grid(row=0, column=0, padx=5, pady=5)
+        right_column.columnconfigure(0, weight=1)
 
-        self.search_entry = tk.Entry(
-            search_frame,
-            width=25
+        self.create_search_section(left_column)
+        self.create_order_creation_section(left_column)
+        self.create_status_update_section(right_column)
+        self.create_order_deletion_section(right_column)
+
+        self.create_action_tools(main_frame)
+        self.create_output_area(main_frame)
+        self.create_status_bar(main_frame)
+
+        self.search_entry.focus_set()
+
+    def create_search_section(self, parent):
+        """Creates the order search section."""
+
+        search_frame = create_section(parent, "Search order", row=0)
+
+        ttk.Label(search_frame, text="Order code:").grid(
+            row=0,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
         )
-        self.search_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.search_entry = ttk.Entry(search_frame, width=ENTRY_WIDTH)
+        self.search_entry.grid(
+            row=0,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
+        )
         self.search_entry.bind(
             "<Return>",
-            lambda event: self.search_order_by_code()
+            lambda event: self.search_order_by_code(),
         )
 
-        search_button = tk.Button(
+        ttk.Button(
             search_frame,
             text="Search",
-            width=15,
-            command=self.search_order_by_code
+            width=BUTTON_WIDTH,
+            command=self.search_order_by_code,
+        ).grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        search_button.grid(row=0, column=2, padx=5, pady=5)
 
-    def create_order_creation_section(self):
-        """
-        Creates the manual order creation section.
-        """
+    def create_order_creation_section(self, parent):
+        """Creates the manual order creation section."""
 
-        create_frame = tk.LabelFrame(
-            self.root,
-            text="Create order"
+        create_frame = create_section(parent, "Create order", row=1)
+
+        ttk.Label(create_frame, text="Order code:").grid(
+            row=0,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
         )
-        create_frame.pack(pady=5, padx=10, fill="x")
-
-        order_code_label = tk.Label(
+        self.create_order_code_entry = ttk.Entry(
             create_frame,
-            text="Order code:"
+            width=ENTRY_WIDTH,
         )
-        order_code_label.grid(row=0, column=0, padx=5, pady=5)
+        self.create_order_code_entry.grid(
+            row=0,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
+        )
 
-        self.create_order_code_entry = tk.Entry(
+        ttk.Label(create_frame, text="Customer name:").grid(
+            row=1,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
+        )
+        self.create_customer_name_entry = ttk.Entry(
             create_frame,
-            width=20
+            width=ENTRY_WIDTH,
         )
-        self.create_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.create_customer_name_entry.grid(
+            row=1,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
+        )
 
-        customer_name_label = tk.Label(
+        ttk.Label(create_frame, text="Quantity:").grid(
+            row=2,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
+        )
+        self.create_quantity_entry = ttk.Entry(
             create_frame,
-            text="Customer name:"
+            width=ENTRY_WIDTH,
         )
-        customer_name_label.grid(row=0, column=2, padx=5, pady=5)
+        self.create_quantity_entry.grid(
+            row=2,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
+        )
 
-        self.create_customer_name_entry = tk.Entry(
+        ttk.Label(create_frame, text="Status:").grid(
+            row=3,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
+        )
+
+        self.create_status_value = tk.StringVar(value=DEFAULT_STATUS)
+        ttk.Combobox(
             create_frame,
-            width=25
+            textvariable=self.create_status_value,
+            values=VALID_STATUSES,
+            state="readonly",
+            width=ENTRY_WIDTH - 2,
+        ).grid(
+            row=3,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        self.create_customer_name_entry.grid(row=0, column=3, padx=5, pady=5)
 
-        quantity_label = tk.Label(
-            create_frame,
-            text="Quantity:"
-        )
-        quantity_label.grid(row=1, column=0, padx=5, pady=5)
-
-        self.create_quantity_entry = tk.Entry(
-            create_frame,
-            width=20
-        )
-        self.create_quantity_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        status_label = tk.Label(
-            create_frame,
-            text="Status:"
-        )
-        status_label.grid(row=1, column=2, padx=5, pady=5)
-
-        self.create_status_value = tk.StringVar(self.root)
-        self.create_status_value.set("pending")
-
-        status_menu = tk.OptionMenu(
-            create_frame,
-            self.create_status_value,
-            *VALID_STATUSES
-        )
-        status_menu.config(width=18)
-        status_menu.grid(row=1, column=3, padx=5, pady=5)
-
-        create_button = tk.Button(
+        ttk.Button(
             create_frame,
             text="Create order",
-            width=20,
-            command=self.create_order_from_form
+            width=BUTTON_WIDTH,
+            command=self.create_order_from_form,
+        ).grid(
+            row=4,
+            column=0,
+            columnspan=2,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        create_button.grid(row=2, column=0, columnspan=4, padx=5, pady=10)
 
-    def create_status_update_section(self):
-        """
-        Creates the order status update section.
-        """
+    def create_status_update_section(self, parent):
+        """Creates the order status update section."""
 
-        update_frame = tk.LabelFrame(
-            self.root,
-            text="Update order status"
+        update_frame = create_section(parent, "Update order status", row=0)
+
+        ttk.Label(update_frame, text="Order code:").grid(
+            row=0,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
         )
-        update_frame.pack(pady=5, padx=10, fill="x")
-
-        update_code_label = tk.Label(
+        self.update_order_code_entry = ttk.Entry(
             update_frame,
-            text="Order code:"
+            width=ENTRY_WIDTH,
         )
-        update_code_label.grid(row=0, column=0, padx=5, pady=5)
+        self.update_order_code_entry.grid(
+            row=0,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
+        )
 
-        self.update_order_code_entry = tk.Entry(
+        ttk.Label(update_frame, text="New status:").grid(
+            row=1,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
+        )
+
+        self.update_status_value = tk.StringVar(value=DEFAULT_STATUS)
+        ttk.Combobox(
             update_frame,
-            width=25
+            textvariable=self.update_status_value,
+            values=VALID_STATUSES,
+            state="readonly",
+            width=ENTRY_WIDTH - 2,
+        ).grid(
+            row=1,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        self.update_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        update_status_label = tk.Label(
-            update_frame,
-            text="New status:"
-        )
-        update_status_label.grid(row=0, column=2, padx=5, pady=5)
-
-        self.update_status_value = tk.StringVar(self.root)
-        self.update_status_value.set("pending")
-
-        update_status_menu = tk.OptionMenu(
-            update_frame,
-            self.update_status_value,
-            *VALID_STATUSES
-        )
-        update_status_menu.config(width=18)
-        update_status_menu.grid(row=0, column=3, padx=5, pady=5)
-
-        update_button = tk.Button(
+        ttk.Button(
             update_frame,
             text="Update status",
-            width=20,
-            command=self.update_order_status_from_form
+            width=BUTTON_WIDTH,
+            command=self.update_order_status_from_form,
+        ).grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        update_button.grid(row=0, column=4, padx=5, pady=5)
 
-    def create_order_deletion_section(self):
-        """
-        Creates the safe order deletion section.
-        """
+    def create_order_deletion_section(self, parent):
+        """Creates the safe order deletion section."""
 
-        delete_frame = tk.LabelFrame(
-            self.root,
-            text="Delete order"
+        delete_frame = create_section(parent, "Delete order", row=1)
+
+        ttk.Label(delete_frame, text="Order code:").grid(
+            row=0,
+            column=0,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
         )
-        delete_frame.pack(pady=5, padx=10, fill="x")
-
-        delete_code_label = tk.Label(
+        self.delete_order_code_entry = ttk.Entry(
             delete_frame,
-            text="Order code:"
+            width=ENTRY_WIDTH,
         )
-        delete_code_label.grid(row=0, column=0, padx=5, pady=5)
-
-        self.delete_order_code_entry = tk.Entry(
-            delete_frame,
-            width=25
+        self.delete_order_code_entry.grid(
+            row=0,
+            column=1,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        self.delete_order_code_entry.grid(row=0, column=1, padx=5, pady=5)
         self.delete_order_code_entry.bind(
             "<Return>",
-            lambda event: self.delete_order_from_form()
+            lambda event: self.delete_order_from_form(),
         )
 
-        delete_button = tk.Button(
+        ttk.Label(
+            delete_frame,
+            text="A confirmation preview is shown before permanent deletion.",
+            wraplength=320,
+        ).grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="w",
+        )
+
+        ttk.Button(
             delete_frame,
             text="Delete order",
-            width=20,
-            command=self.delete_order_from_form
+            width=BUTTON_WIDTH,
+            command=self.delete_order_from_form,
+        ).grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            padx=CONTROL_PADDING,
+            pady=CONTROL_PADDING,
+            sticky="ew",
         )
-        delete_button.grid(row=0, column=2, padx=5, pady=5)
 
-        warning_label = tk.Label(
-            delete_frame,
-            text="A confirmation preview is shown before permanent deletion."
+    def create_action_tools(self, parent):
+        """Creates visually separated cards for database and CSV tools."""
+
+        tools_frame = ttk.Frame(parent)
+        tools_frame.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            pady=(OUTER_PADDING, CONTROL_PADDING),
         )
-        warning_label.grid(row=0, column=3, padx=10, pady=5)
 
-    def create_action_buttons(self):
-        """
-        Creates buttons for common database and CSV actions.
-        """
+        for column in range(4):
+            tools_frame.columnconfigure(column, weight=1, uniform="tools")
 
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=10)
-
-        show_orders_button = tk.Button(
-            button_frame,
-            text="Show database orders",
-            width=25,
-            command=self.show_database_orders
+        create_action_card(
+            tools_frame,
+            title="Database",
+            button_text="Show orders",
+            command=self.show_database_orders,
+            column=0,
         )
-        show_orders_button.grid(row=0, column=0, padx=5, pady=5)
-
-        import_csv_button = tk.Button(
-            button_frame,
-            text="Import CSV orders",
-            width=25,
-            command=self.import_csv_orders
+        create_action_card(
+            tools_frame,
+            title="CSV import",
+            button_text="Import orders",
+            command=self.import_csv_orders,
+            column=1,
         )
-        import_csv_button.grid(row=0, column=1, padx=5, pady=5)
-
-        show_statistics_button = tk.Button(
-            button_frame,
-            text="Show statistics",
-            width=25,
-            command=self.show_statistics
+        create_action_card(
+            tools_frame,
+            title="Statistics",
+            button_text="Show statistics",
+            command=self.show_statistics,
+            column=2,
         )
-        show_statistics_button.grid(row=0, column=2, padx=5, pady=5)
-
-        clear_output_button = tk.Button(
-            button_frame,
-            text="Clear output",
-            width=25,
-            command=self.clear_output
+        create_action_card(
+            tools_frame,
+            title="Output",
+            button_text="Clear output",
+            command=self.clear_output,
+            column=3,
         )
-        clear_output_button.grid(row=1, column=1, padx=5, pady=5)
 
-    def create_output_area(self):
-        """
-        Creates the text area used to display operation results.
-        """
+    def create_output_area(self, parent):
+        """Creates a labelled, scrollable area for operation results."""
 
-        self.output_text = tk.Text(
-            self.root,
-            height=16,
-            width=115
+        output_frame = ttk.LabelFrame(
+            parent,
+            text="Activity output",
+            padding=CONTROL_PADDING,
         )
-        self.output_text.pack(padx=10, pady=10)
+        output_frame.grid(row=3, column=0, sticky="nsew")
+        output_frame.columnconfigure(0, weight=1)
+        output_frame.rowconfigure(0, weight=1)
+
+        self.output_text = scrolledtext.ScrolledText(
+            output_frame,
+            height=OUTPUT_HEIGHT,
+            wrap=tk.WORD,
+            font=("Courier", 11),
+        )
+        self.output_text.grid(row=0, column=0, sticky="nsew")
+
+    def create_status_bar(self, parent):
+        """Creates the status bar displayed below the output area."""
+
+        ttk.Separator(parent, orient="horizontal").grid(
+            row=4,
+            column=0,
+            sticky="ew",
+            pady=(CONTROL_PADDING, 0),
+        )
+        ttk.Label(
+            parent,
+            textvariable=self.status_message,
+            anchor="w",
+        ).grid(
+            row=5,
+            column=0,
+            sticky="ew",
+            pady=(CONTROL_PADDING, 0),
+        )
+
+    def set_status(self, message):
+        """Updates the status bar message."""
+
+        self.status_message.set(message)
 
     def clear_output(self):
-        """
-        Clears the output area.
-        """
+        """Clears the output area."""
 
         self.output_text.delete("1.0", tk.END)
+        self.set_status("Output cleared")
 
     def write_output(self, text):
-        """
-        Writes text inside the output area.
-        """
+        """Writes text inside the output area."""
 
         self.output_text.insert(tk.END, text)
         self.output_text.insert(tk.END, "\n")
         self.output_text.see(tk.END)
 
     def clear_create_order_form(self):
-        """
-        Clears the create order form fields.
-        """
+        """Clears the create order form fields."""
 
         self.create_order_code_entry.delete(0, tk.END)
         self.create_customer_name_entry.delete(0, tk.END)
         self.create_quantity_entry.delete(0, tk.END)
-        self.create_status_value.set("pending")
+        self.create_status_value.set(DEFAULT_STATUS)
 
     def create_order_from_form(self):
-        """
-        Creates a new order using the existing service layer.
-        """
+        """Creates a new order using the existing service layer."""
 
         order = {
             "order_code": self.create_order_code_entry.get(),
             "customer_name": self.create_customer_name_entry.get(),
             "quantity": self.create_quantity_entry.get(),
-            "status": self.create_status_value.get()
+            "status": self.create_status_value.get(),
         }
 
         result = create_order(order)
@@ -352,10 +490,11 @@ class OrderIntegrityCheckerGUI:
             self.write_output(f"Status: {created_order['status']}")
 
             self.clear_create_order_form()
+            self.set_status(f"Created order {created_order['order_code']}")
 
             messagebox.showinfo(
                 "Create order",
-                "Order created successfully."
+                "Order created successfully.",
             )
             return
 
@@ -366,15 +505,14 @@ class OrderIntegrityCheckerGUI:
         for error in result["errors"]:
             self.write_output(f"- {error}")
 
+        self.set_status("Order creation failed validation")
         messagebox.showwarning(
             "Create order",
-            "Order could not be created. Check the validation errors."
+            "Order could not be created. Check the validation errors.",
         )
 
     def update_order_status_from_form(self):
-        """
-        Updates an order status using the existing service layer.
-        """
+        """Updates an order status using the existing service layer."""
 
         order_code = self.update_order_code_entry.get()
         new_status = self.update_status_value.get()
@@ -382,9 +520,10 @@ class OrderIntegrityCheckerGUI:
         self.clear_output()
 
         if order_code.strip() == "":
+            self.set_status("Status update requires an order code")
             messagebox.showwarning(
                 "Update order status",
-                "Please enter an order code."
+                "Please enter an order code.",
             )
             return
 
@@ -393,25 +532,24 @@ class OrderIntegrityCheckerGUI:
         self.write_output("UPDATE STATUS RESULT")
         self.write_output("--------------------")
         self.write_output(result["message"])
+        self.set_status(result["message"])
 
         if result["success"]:
             self.update_order_code_entry.delete(0, tk.END)
-            self.update_status_value.set("pending")
+            self.update_status_value.set(DEFAULT_STATUS)
 
             messagebox.showinfo(
                 "Update order status",
-                result["message"]
+                result["message"],
             )
         else:
             messagebox.showwarning(
                 "Update order status",
-                result["message"]
+                result["message"],
             )
 
     def delete_order_from_form(self):
-        """
-        Deletes an order after displaying a confirmation preview.
-        """
+        """Deletes an order after displaying a confirmation preview."""
 
         order_code = self.delete_order_code_entry.get()
 
@@ -421,9 +559,10 @@ class OrderIntegrityCheckerGUI:
 
         if order_code.strip() == "":
             self.write_output("No order code was provided.")
+            self.set_status("Deletion requires an order code")
             messagebox.showwarning(
                 "Delete order",
-                "Please enter an order code."
+                "Please enter an order code.",
             )
             return
 
@@ -431,9 +570,10 @@ class OrderIntegrityCheckerGUI:
 
         if order is None:
             self.write_output("No order found with the provided code.")
+            self.set_status("Order not found")
             messagebox.showwarning(
                 "Delete order",
-                "No order found with the provided code."
+                "No order found with the provided code.",
             )
             return
 
@@ -443,15 +583,18 @@ class OrderIntegrityCheckerGUI:
             f"Customer: {order['customer_name']}\n"
             f"Quantity: {order['quantity']}\n"
             f"Status: {order['status']}\n\n"
-            "This action cannot be undone."
+            "This action cannot be undone.",
         )
 
         if not confirmed:
-            self.write_output(f"Deletion of order {order['order_code']} cancelled.")
+            message = f"Deletion of order {order['order_code']} cancelled."
+            self.write_output(message)
+            self.set_status(message)
             return
 
         result = delete_order(order["order_code"])
         self.write_output(result["message"])
+        self.set_status(result["message"])
 
         if result["success"]:
             self.delete_order_code_entry.delete(0, tk.END)
@@ -459,21 +602,18 @@ class OrderIntegrityCheckerGUI:
 
             messagebox.showinfo(
                 "Delete order",
-                result["message"]
+                result["message"],
             )
         else:
             messagebox.showwarning(
                 "Delete order",
-                result["message"]
+                result["message"],
             )
 
     def show_database_orders(self):
-        """
-        Shows all orders stored in the database.
-        """
+        """Shows all orders stored in the database."""
 
         self.clear_output()
-
         orders = get_database_orders()
 
         self.write_output("DATABASE ORDERS")
@@ -481,6 +621,7 @@ class OrderIntegrityCheckerGUI:
 
         if len(orders) == 0:
             self.write_output("No orders found in the database.")
+            self.set_status("Database contains no orders")
             return
 
         for order in orders:
@@ -492,13 +633,12 @@ class OrderIntegrityCheckerGUI:
                 f"Status: {order['status']}"
             )
 
+        self.set_status(f"Displayed {len(orders)} database orders")
+
     def import_csv_orders(self):
-        """
-        Imports valid CSV orders using the existing service layer.
-        """
+        """Imports valid CSV orders using the existing service layer."""
 
         self.clear_output()
-
         preview = preview_csv_import()
 
         validation_results = preview["validation_results"]
@@ -511,9 +651,10 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Invalid orders found: {invalid_orders}")
 
         if valid_orders == 0 and invalid_orders == 0:
+            self.set_status("CSV file contains no orders")
             messagebox.showinfo(
                 "Import CSV orders",
-                "No orders found in the CSV file."
+                "No orders found in the CSV file.",
             )
             return
 
@@ -522,11 +663,12 @@ class OrderIntegrityCheckerGUI:
             "Valid orders will be imported into the database.\n"
             "Invalid orders will be skipped and reported.\n"
             "The CSV file will be cleared after import.\n\n"
-            "Do you want to continue?"
+            "Do you want to continue?",
         )
 
         if not confirmed:
             self.write_output("\nImport cancelled.")
+            self.set_status("CSV import cancelled")
             return
 
         result = import_csv_orders(validation_results)
@@ -544,30 +686,35 @@ class OrderIntegrityCheckerGUI:
                 "Check the invalid orders report for details."
             )
 
+        saved_count = len(result["saved_orders"])
+        skipped_count = len(result["skipped_orders"])
+
         self.write_output("\nSUMMARY")
         self.write_output("-------")
-        self.write_output(f"Saved orders: {len(result['saved_orders'])}")
-        self.write_output(f"Invalid orders: {len(result['skipped_orders'])}")
+        self.write_output(f"Saved orders: {saved_count}")
+        self.write_output(f"Invalid orders: {skipped_count}")
         self.write_output("CSV file cleared after import.")
 
+        self.set_status(
+            f"CSV import completed: {saved_count} saved, "
+            f"{skipped_count} invalid"
+        )
         messagebox.showinfo(
             "Import completed",
-            "CSV import completed successfully."
+            "CSV import completed successfully.",
         )
 
     def search_order_by_code(self):
-        """
-        Searches a database order by order code.
-        """
+        """Searches a database order by order code."""
 
         order_code = self.search_entry.get()
-
         self.clear_output()
 
         if order_code.strip() == "":
+            self.set_status("Search requires an order code")
             messagebox.showwarning(
                 "Search order",
-                "Please enter an order code."
+                "Please enter an order code.",
             )
             return
 
@@ -578,6 +725,7 @@ class OrderIntegrityCheckerGUI:
 
         if order is None:
             self.write_output("No order found with the provided code.")
+            self.set_status("Order not found")
             return
 
         self.write_output(f"ID: {order['id']}")
@@ -586,15 +734,15 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Quantity: {order['quantity']}")
         self.write_output(f"Status: {order['status']}")
         self.write_output("")
-        self.write_output("The order code is normalized automatically before searching.")
+        self.write_output(
+            "The order code is normalized automatically before searching."
+        )
+        self.set_status(f"Found order {order['order_code']}")
 
     def show_statistics(self):
-        """
-        Shows database order statistics.
-        """
+        """Shows database order statistics."""
 
         self.clear_output()
-
         statistics = get_statistics()
 
         self.write_output("ORDER STATISTICS")
@@ -604,11 +752,13 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Cancelled orders: {statistics['cancelled']}")
         self.write_output(f"Total orders: {statistics['total']}")
 
+        self.set_status(
+            f"Displayed statistics for {statistics['total']} orders"
+        )
+
 
 def main():
-    """
-    GUI entry point.
-    """
+    """GUI entry point."""
 
     create_database()
     insert_sample_orders()
