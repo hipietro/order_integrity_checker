@@ -1,0 +1,15 @@
+"""Shared configuration values for the Tkinter interface."""
+
+WINDOW_TITLE = "Order Integrity Checker"
+WINDOW_GEOMETRY = "1100x760"
+WINDOW_MIN_WIDTH = 900
+WINDOW_MIN_HEIGHT = 650
+
+OUTER_PADDING = 12
+SECTION_PADDING = 8
+CONTROL_PADDING = 5
+
+BUTTON_WIDTH = 20
+ENTRY_WIDTH = 24
+OUTPUT_HEIGHT = 16
+DEFAULT_STATUS = "pending"
