@@ -17,7 +17,8 @@ It is intentionally simple, but it focuses on realistic software development con
 - SQLite persistence
 - service-layer separation
 - CLI interaction
-- Tkinter GUI
+- responsive Tkinter GUI
+- reusable interface components
 - automated unit testing
 - GitHub Actions CI
 
@@ -35,6 +36,10 @@ It is intentionally simple, but it focuses on realistic software development con
 - Update order status
 - Delete orders safely from the CLI or GUI
 - Preview order details before confirming a GUI deletion
+- Use a responsive two-column GUI workspace
+- Keep search, creation, update, deletion, import, and statistics visually separated
+- Display results in a scrollable activity panel
+- Show operation feedback in a status bar
 - Export database orders to CSV
 - Run automated tests locally and on GitHub Actions
 
@@ -43,7 +48,7 @@ It is intentionally simple, but it focuses on realistic software development con
 - Python
 - SQLite
 - CSV
-- Tkinter
+- Tkinter and ttk
 - unittest
 - GitHub Actions
 
@@ -59,11 +64,13 @@ order_integrity_checker/
 │       └── tests.yml
 │
 ├── docs/
+│   ├── gui_layout.md
 │   └── gui_manual_test_checklist.md
 │
 ├── tests/
 │   ├── __init__.py
 │   ├── test_services.py
+│   ├── test_ui_config.py
 │   └── test_validator.py
 │
 ├── config.py
@@ -75,6 +82,8 @@ order_integrity_checker/
 ├── new_orders.csv
 ├── normalizer.py
 ├── services.py
+├── ui_components.py
+├── ui_config.py
 ├── validator.py
 ├── README.md
 └── .gitignore
@@ -146,9 +155,11 @@ python3 gui.py
 
 The Tkinter GUI reuses the same service layer used by the CLI. It supports searching, creating, updating, deleting, importing, and inspecting orders.
 
+The interface groups search and creation in the left workspace column, update and deletion in the right column, and keeps database, CSV import, statistics, and output tools in separate cards. The activity panel is scrollable and expands when the window is resized.
+
 Before deleting an order, the GUI displays its code, customer, quantity, and current status. The user must explicitly confirm the permanent deletion.
 
-A manual regression checklist is available in [`docs/gui_manual_test_checklist.md`](docs/gui_manual_test_checklist.md).
+Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md). A broader manual regression checklist is available in [`docs/gui_manual_test_checklist.md`](docs/gui_manual_test_checklist.md).
 
 ## How to run tests
 
@@ -156,7 +167,7 @@ A manual regression checklist is available in [`docs/gui_manual_test_checklist.m
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order deletion, and CSV export behavior.
+The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order deletion, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
