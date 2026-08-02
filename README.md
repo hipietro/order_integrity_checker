@@ -36,6 +36,10 @@ It is intentionally simple, but it focuses on realistic software development con
 - Update order status
 - Delete orders safely from the CLI or GUI
 - Preview order details before confirming a GUI deletion
+- Filter database orders by status
+- Filter database orders by partial customer name
+- Sort orders by order code or quantity
+- Choose ascending or descending sort direction
 - Use a responsive two-column GUI workspace
 - Keep search, creation, update, deletion, import, and statistics visually separated
 - Display results in a scrollable activity panel
@@ -69,6 +73,8 @@ order_integrity_checker/
 │
 ├── tests/
 │   ├── __init__.py
+│   ├── test_order_query_service.py
+│   ├── test_order_update_services.py
 │   ├── test_services.py
 │   ├── test_ui_config.py
 │   └── test_validator.py
@@ -81,6 +87,8 @@ order_integrity_checker/
 ├── menu.py
 ├── new_orders.csv
 ├── normalizer.py
+├── order_browser_cli.py
+├── order_query_service.py
 ├── services.py
 ├── ui_components.py
 ├── ui_config.py
@@ -103,7 +111,8 @@ The application follows this workflow:
 6. Skips invalid orders.
 7. Generates an invalid orders report.
 8. Allows the user to manage database orders from the CLI or GUI.
-9. Allows exporting database orders to CSV.
+9. Allows filtering and sorting database orders without modifying them.
+10. Allows exporting database orders to CSV.
 
 ## Validation rules
 
@@ -147,6 +156,21 @@ python3 main.py
 
 The CLI opens an interactive menu that allows importing, searching, updating, deleting, exporting, and inspecting orders.
 
+### Filter and sort database orders
+
+```bash
+python3 order_browser_cli.py
+```
+
+The order browser lets you:
+
+- select all orders or a specific status
+- search by a complete or partial customer name
+- sort by `order_code` or `quantity`
+- choose `ascending` or `descending` order
+
+The query service returns a new list and does not modify the orders stored in SQLite.
+
 ## How to run the GUI
 
 ```bash
@@ -167,7 +191,7 @@ Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md).
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order deletion, CSV export behavior, and GUI configuration constraints.
+The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order updates, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
