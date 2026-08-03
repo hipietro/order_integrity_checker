@@ -5,6 +5,7 @@ from database import (
     get_all_orders,
     get_order_by_code,
     get_order_statistics,
+    get_status_history_for_order,
     insert_order_into_database,
     update_order_status_in_database
 )
@@ -158,6 +159,42 @@ def update_order_status(order_code, new_status):
     }
 
 
+def get_order_status_history(order_code):
+    """
+    Returns the recorded status history for an order code.
+
+    History remains available after an order is deleted. If neither an active
+    order nor history exists for the normalized code, the service returns an
+    unsuccessful result.
+    """
+
+    normalized_code = normalize_order_code(order_code)
+    order = get_order_by_code(normalized_code)
+    history = get_status_history_for_order(normalized_code)
+
+    if order is None and len(history) == 0:
+        return {
+            "success": False,
+            "order_code": normalized_code,
+            "current_status": None,
+            "history": [],
+            "message": f"No order or status history found for code {normalized_code}."
+        }
+
+    current_status = None
+
+    if order is not None:
+        current_status = order["status"]
+
+    return {
+        "success": True,
+        "order_code": normalized_code,
+        "current_status": current_status,
+        "history": history,
+        "message": f"Found {len(history)} status changes for order {normalized_code}."
+    }
+
+
 def delete_order(order_code):
     """
     Deletes an existing order from the database.
@@ -199,15 +236,15 @@ def clear_csv_input():
         "message": "CSV file cleared successfully."
     }
 
+
 def export_database_orders():
     """
     Exports all database orders to a CSV file.
 
-    This function is reusable by both the CLI and a future GUI.
+    This function is reusable by both the CLI and GUI.
     """
 
     orders = get_all_orders()
-
     exported_orders = export_orders_to_csv(orders)
 
     return {
