@@ -15,6 +15,7 @@ It is intentionally simple, but it focuses on realistic software development con
 - input validation
 - CSV processing
 - SQLite persistence
+- transactional audit history
 - service-layer separation
 - CLI interaction
 - responsive Tkinter GUI
@@ -34,6 +35,9 @@ It is intentionally simple, but it focuses on realistic software development con
 - Search orders by code
 - Insert orders manually
 - Update order status
+- Record old status, new status, and timestamp for every real transition
+- Preserve status history after an order is deleted
+- Inspect status history from a dedicated CLI
 - Delete orders safely from the CLI or GUI
 - Preview order details before confirming a GUI deletion
 - Filter database orders by status
@@ -69,13 +73,15 @@ order_integrity_checker/
 │
 ├── docs/
 │   ├── gui_layout.md
-│   └── gui_manual_test_checklist.md
+│   ├── gui_manual_test_checklist.md
+│   └── status_history.md
 │
 ├── tests/
 │   ├── __init__.py
 │   ├── test_order_query_service.py
 │   ├── test_order_update_services.py
 │   ├── test_services.py
+│   ├── test_status_history.py
 │   ├── test_ui_config.py
 │   └── test_validator.py
 │
@@ -90,6 +96,7 @@ order_integrity_checker/
 ├── order_browser_cli.py
 ├── order_query_service.py
 ├── services.py
+├── status_history_cli.py
 ├── ui_components.py
 ├── ui_config.py
 ├── validator.py
@@ -111,8 +118,10 @@ The application follows this workflow:
 6. Skips invalid orders.
 7. Generates an invalid orders report.
 8. Allows the user to manage database orders from the CLI or GUI.
-9. Allows filtering and sorting database orders without modifying them.
-10. Allows exporting database orders to CSV.
+9. Records each real status transition in the same transaction as the update.
+10. Allows retrieving status history in chronological order.
+11. Allows filtering and sorting database orders without modifying them.
+12. Allows exporting database orders to CSV.
 
 ## Validation rules
 
@@ -171,6 +180,16 @@ The order browser lets you:
 
 The query service returns a new list and does not modify the orders stored in SQLite.
 
+### Inspect order status history
+
+```bash
+python3 status_history_cli.py
+```
+
+Enter an order code to display its current status and every recorded transition from oldest to newest. Each entry contains the previous status, the new status, and the SQLite timestamp.
+
+History is created only when the status actually changes. It remains available after the active order is deleted. Design details are available in [`docs/status_history.md`](docs/status_history.md).
+
 ## How to run the GUI
 
 ```bash
@@ -191,7 +210,7 @@ Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md).
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order updates, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
+The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
