@@ -6,7 +6,7 @@ from normalizer import normalize_order, normalize_order_code, normalize_status
 
 def create_database():
     """
-    Creates the SQLite database and the orders table if they do not already exist.
+    Creates the SQLite database and its tables if they do not already exist.
     """
 
     connection = sqlite3.connect(DATABASE_NAME)
@@ -20,6 +20,21 @@ def create_database():
             quantity INTEGER NOT NULL,
             status TEXT NOT NULL
         )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS order_status_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_code TEXT NOT NULL,
+            old_status TEXT NOT NULL,
+            new_status TEXT NOT NULL,
+            changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_status_history_order_code
+        ON order_status_history (order_code)
     """)
 
     connection.commit()
@@ -51,9 +66,7 @@ def insert_sample_orders():
 
 def row_to_order(row):
     """
-    Converts a database row into a dictionary.
-
-    This makes database results easier to reuse in both CLI and future GUI code.
+    Converts an order database row into a dictionary.
     """
 
     return {
@@ -62,6 +75,20 @@ def row_to_order(row):
         "customer_name": row[2],
         "quantity": row[3],
         "status": row[4]
+    }
+
+
+def row_to_status_history(row):
+    """
+    Converts a status history database row into a dictionary.
+    """
+
+    return {
+        "id": row[0],
+        "order_code": row[1],
+        "old_status": row[2],
+        "new_status": row[3],
+        "changed_at": row[4]
     }
 
 
@@ -117,6 +144,34 @@ def get_order_by_code(order_code):
         return None
 
     return row_to_order(row)
+
+
+def get_status_history_for_order(order_code):
+    """
+    Returns all recorded status changes for one order, oldest first.
+    """
+
+    normalized_code = normalize_order_code(order_code)
+
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT id, order_code, old_status, new_status, changed_at
+        FROM order_status_history
+        WHERE order_code = ?
+        ORDER BY id
+    """, (normalized_code,))
+
+    rows = cursor.fetchall()
+    connection.close()
+
+    history = []
+
+    for row in rows:
+        history.append(row_to_status_history(row))
+
+    return history
 
 
 def order_exists_in_database(order_code):
@@ -188,9 +243,12 @@ def get_order_statistics():
 
 def update_order_status_in_database(order_code, new_status):
     """
-    Updates the status of an existing order.
+    Updates an order status and records the change in one transaction.
 
-    Returns True if an order was updated, False otherwise.
+    Returns True when the order exists and the operation succeeds. A request
+    that keeps the same status succeeds without creating a duplicate history
+    entry. Returns False for unsupported statuses, missing orders, or database
+    failures.
     """
 
     normalized_code = normalize_order_code(order_code)
@@ -202,26 +260,61 @@ def update_order_status_in_database(order_code, new_status):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
-    cursor.execute("""
-        UPDATE orders
-        SET status = ?
-        WHERE order_code = ?
-    """, (normalized_status, normalized_code))
+    try:
+        cursor.execute("""
+            SELECT status
+            FROM orders
+            WHERE order_code = ?
+        """, (normalized_code,))
 
-    connection.commit()
+        row = cursor.fetchone()
 
-    updated_rows = cursor.rowcount
+        if row is None:
+            return False
 
-    connection.close()
+        old_status = row[0]
 
-    return updated_rows > 0
+        if old_status == normalized_status:
+            return True
+
+        cursor.execute("""
+            UPDATE orders
+            SET status = ?
+            WHERE order_code = ?
+        """, (normalized_status, normalized_code))
+
+        if cursor.rowcount == 0:
+            connection.rollback()
+            return False
+
+        cursor.execute("""
+            INSERT INTO order_status_history (
+                order_code,
+                old_status,
+                new_status
+            )
+            VALUES (?, ?, ?)
+        """, (
+            normalized_code,
+            old_status,
+            normalized_status
+        ))
+
+        connection.commit()
+        return True
+    except sqlite3.Error:
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
 
 
 def delete_order_from_database(order_code):
     """
     Deletes an order from the database.
 
-    Returns True if an order was deleted, False otherwise.
+    Returns True if an order was deleted, False otherwise. Existing status
+    history is retained as an audit record.
     """
 
     normalized_code = normalize_order_code(order_code)
