@@ -9,23 +9,18 @@ from services import (
     import_csv_orders,
     preview_csv_import,
     search_order,
-    update_order_status
+    update_order_status,
 )
 
+
 def normalize_cli_choice(choice):
-    """
-    Normalizes a CLI choice by removing spaces and converting it to lowercase.
-    """
+    """Normalizes a CLI choice by trimming spaces and using lowercase."""
 
     return choice.strip().lower()
 
 
 def ask_confirmation(message):
-    """
-    Asks the user for a y/n confirmation.
-
-    The answer is case-insensitive, so Y/y/N/n are all accepted.
-    """
+    """Asks the user for a case-insensitive y/n confirmation."""
 
     while True:
         choice = normalize_cli_choice(input(f"{message} y/n: "))
@@ -42,34 +37,8 @@ def ask_confirmation(message):
             print("Invalid confirmation. Please choose y or n.")
 
 
-def ask_import_choice():
-    """
-    Asks the user what to do after the CSV import preview.
-
-    Accepted choices:
-    - y: confirm import
-    - n: cancel import
-    - w: show validation problems
-    """
-
-    while True:
-        choice = normalize_cli_choice(
-            input("\nChoose: y = import, n = cancel, w = show problems: ")
-        )
-
-        if choice in ["y", "n", "w"]:
-            return choice
-
-        if choice == "":
-            print("Choice cannot be empty. Please choose y, n, or w.")
-        else:
-            print("Invalid option. Please choose y, n, or w.")
-
-
 def read_menu_choice():
-    """
-    Reads and normalizes the main menu choice.
-    """
+    """Reads and normalizes the main menu choice."""
 
     choice = input("\nChoose an option: ").strip()
 
@@ -81,9 +50,7 @@ def read_menu_choice():
 
 
 def print_order(order):
-    """
-    Prints a single order in a readable format.
-    """
+    """Prints a single order in a readable format."""
 
     print(
         f"ID: {order['id']} | "
@@ -95,9 +62,7 @@ def print_order(order):
 
 
 def show_validation_problems(validation_results):
-    """
-    Shows invalid orders from already calculated validation results.
-    """
+    """Shows invalid orders from already calculated validation results."""
 
     found_invalid_orders = False
 
@@ -115,7 +80,7 @@ def show_validation_problems(validation_results):
             print(f"Customer name: {order['customer_name']}")
             print(f"Quantity: {order['quantity']}")
             print(f"Status: {order['status']}")
-            print("Errors:")
+            print("Reasons for skipping:")
 
             for error in errors:
                 print(f"- {error}")
@@ -124,73 +89,77 @@ def show_validation_problems(validation_results):
         print("No invalid orders found.")
 
 
+def show_csv_import_preview(preview):
+    """Shows counts, error totals and skipped-order reasons."""
+
+    print("\nCSV IMPORT PREVIEW")
+    print("------------------")
+    print(f"Total CSV orders: {preview['total_orders']}")
+    print(f"Orders to import: {preview['valid_orders']}")
+    print(f"Orders to skip: {preview['invalid_orders']}")
+
+    if len(preview["error_summary"]) > 0:
+        print("\nVALIDATION REASON SUMMARY")
+        print("-------------------------")
+
+        for item in preview["error_summary"]:
+            print(f"- {item['reason']}: {item['count']}")
+
+        show_validation_problems(preview["validation_results"])
+
+
 def import_valid_orders_cli():
-    """
-    Handles the CSV import flow from the command-line interface.
-    """
+    """Handles the safe CSV preview and confirmed import flow."""
 
     preview = preview_csv_import()
+    show_csv_import_preview(preview)
 
-    validation_results = preview["validation_results"]
-    valid_orders = preview["valid_orders"]
-    invalid_orders = preview["invalid_orders"]
+    if preview["total_orders"] == 0:
+        print("No orders found. The database and CSV file were not modified.")
+        return
 
-    print("\nIMPORT CHECK")
-    print("------------")
-    print(f"Valid orders ready to import: {valid_orders}")
-    print(f"Invalid orders found: {invalid_orders}")
+    confirmed = ask_confirmation(
+        "Import the valid orders and clear the CSV after completion?"
+    )
+    result = import_csv_orders(preview, confirmed=confirmed)
 
-    print("\nIf you confirm, valid orders will be imported and the CSV file will be cleared.")
+    if result["cancelled"]:
+        print(result["message"])
+        return
 
-    while True:
-        choice = ask_import_choice()
+    if not result["success"]:
+        print(result["message"])
+        print("The CSV file was preserved.")
+        return
 
-        if choice == "w":
-            show_validation_problems(validation_results)
+    print("\nIMPORT RESULT")
+    print("-------------")
 
-        elif choice == "n":
-            print("Import cancelled. No orders were saved and the CSV file was not cleared.")
-            return
+    for order in result["saved_orders"]:
+        print(f"{order['order_code']}: saved into database")
 
-        elif choice == "y":
-            result = import_csv_orders(validation_results)
+    for skipped_order in result["skipped_orders"]:
+        order = skipped_order["order"]
+        reasons = "; ".join(skipped_order["errors"])
+        print(f"{order['order_code']}: skipped — {reasons}")
 
-            print("\nIMPORT RESULT")
-            print("-------------")
-
-            for order in result["saved_orders"]:
-                print(f"{order['order_code']}: saved into database")
-
-            for skipped_order in result["skipped_orders"]:
-                order = skipped_order["order"]
-                print(f"{order['order_code']}: NOT saved. Check the invalid orders report for details.")
-
-            print("\nSUMMARY")
-            print("-------")
-            print(f"Saved orders: {len(result['saved_orders'])}")
-            print(f"Invalid orders: {len(result['skipped_orders'])}")
-            print(f"Invalid orders report generated: {REPORT_FILE_NAME}")
-            print("CSV file cleared after import.")
-
-            return
-
-        else:
-            print("Invalid option. Please choose y, n, or w.")
+    print("\nSUMMARY")
+    print("-------")
+    print(f"Saved orders: {len(result['saved_orders'])}")
+    print(f"Invalid orders: {len(result['skipped_orders'])}")
+    print(f"Invalid orders report generated: {REPORT_FILE_NAME}")
+    print("CSV file cleared after successful import.")
 
 
 def show_invalid_orders_cli():
-    """
-    Shows invalid CSV orders from the command-line interface.
-    """
+    """Shows invalid CSV orders from the command-line interface."""
 
     preview = preview_csv_import()
     show_validation_problems(preview["validation_results"])
 
 
 def show_database_orders_cli():
-    """
-    Shows all database orders from the command-line interface.
-    """
+    """Shows all database orders from the command-line interface."""
 
     orders = get_database_orders()
 
@@ -206,9 +175,7 @@ def show_database_orders_cli():
 
 
 def clear_csv_orders_cli():
-    """
-    Clears the CSV input file from the command-line interface.
-    """
+    """Clears the CSV input file from the command-line interface."""
 
     confirmed = ask_confirmation(
         "Are you sure you want to clear new_orders.csv? This action cannot be undone."
@@ -223,12 +190,9 @@ def clear_csv_orders_cli():
 
 
 def search_order_by_code_cli():
-    """
-    Searches an order from the command-line interface.
-    """
+    """Searches an order from the command-line interface."""
 
     order_code = input("Enter order code to search: ")
-
     order = search_order(order_code)
 
     print("\nSEARCH RESULT")
@@ -241,9 +205,7 @@ def search_order_by_code_cli():
 
 
 def insert_order_manually_cli():
-    """
-    Inserts an order manually from the command-line interface.
-    """
+    """Inserts an order manually from the command-line interface."""
 
     print("\nINSERT NEW ORDER")
     print("----------------")
@@ -252,7 +214,7 @@ def insert_order_manually_cli():
         "order_code": input("Order code: "),
         "customer_name": input("Customer name: "),
         "quantity": input("Quantity: "),
-        "status": input("Status (completed, pending, cancelled): ")
+        "status": input("Status (completed, pending, cancelled): "),
     }
 
     result = create_order(order)
@@ -269,9 +231,7 @@ def insert_order_manually_cli():
 
 
 def show_order_statistics_cli():
-    """
-    Shows order statistics from the command-line interface.
-    """
+    """Shows order statistics from the command-line interface."""
 
     statistics = get_statistics()
 
@@ -284,12 +244,9 @@ def show_order_statistics_cli():
 
 
 def update_order_status_cli():
-    """
-    Updates an order status from the command-line interface.
-    """
+    """Updates an order status from the command-line interface."""
 
     order_code = input("Enter order code to update: ")
-
     order = search_order(order_code)
 
     if order is None:
@@ -301,19 +258,15 @@ def update_order_status_cli():
     print_order(order)
 
     new_status = input("Enter new status (completed, pending, cancelled): ")
-
     result = update_order_status(order_code, new_status)
 
     print(result["message"])
 
 
 def delete_order_by_code_cli():
-    """
-    Deletes an order from the command-line interface.
-    """
+    """Deletes an order from the command-line interface."""
 
     order_code = input("Enter order code to delete: ")
-
     order = search_order(order_code)
 
     if order is None:
@@ -331,13 +284,11 @@ def delete_order_by_code_cli():
         return
 
     result = delete_order(order_code)
-
     print(result["message"])
 
+
 def export_database_orders_cli():
-    """
-    Exports database orders from the command-line interface.
-    """
+    """Exports database orders from the command-line interface."""
 
     result = export_database_orders()
 
@@ -348,9 +299,7 @@ def export_database_orders_cli():
 
 
 def show_menu():
-    """
-    Shows the main menu and handles the user's choices.
-    """
+    """Shows the main menu and handles the user's choices."""
 
     while True:
         print("\nORDER INTEGRITY CHECKER")
@@ -392,7 +341,7 @@ def show_menu():
             delete_order_by_code_cli()
         elif choice == "10":
             export_database_orders_cli()
-        elif choice == "11":   
+        elif choice == "11":
             print("Goodbye!")
             break
         else:
