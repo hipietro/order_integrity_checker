@@ -26,6 +26,11 @@ It is intentionally simple, but it focuses on realistic software development con
 ## Features
 
 - Import orders from `new_orders.csv`
+- Preview every CSV import before modifying data
+- Show how many orders will be imported or skipped
+- Show grouped and per-order validation reasons before confirmation
+- Require explicit confirmation for the preferred import service API
+- Preserve the CSV file when an import is cancelled or fails
 - Validate required fields
 - Detect duplicated order codes inside the CSV file
 - Detect orders already existing in the database
@@ -72,12 +77,14 @@ order_integrity_checker/
 │       └── tests.yml
 │
 ├── docs/
+│   ├── csv_import_preview.md
 │   ├── gui_layout.md
 │   ├── gui_manual_test_checklist.md
 │   └── status_history.md
 │
 ├── tests/
 │   ├── __init__.py
+│   ├── test_csv_import_preview.py
 │   ├── test_order_query_service.py
 │   ├── test_order_update_services.py
 │   ├── test_services.py
@@ -86,6 +93,7 @@ order_integrity_checker/
 │   └── test_validator.py
 │
 ├── config.py
+├── csv_import_preview.py
 ├── csv_manager.py
 ├── database.py
 ├── gui.py
@@ -111,17 +119,18 @@ Generated files such as `orders.db`, `invalid_orders_report.txt`, and `exported_
 The application follows this workflow:
 
 1. Creates a local SQLite database if it does not already exist.
-2. Reads orders from `new_orders.csv`.
-3. Normalizes order data.
-4. Validates each order.
-5. Imports only valid orders.
-6. Skips invalid orders.
-7. Generates an invalid orders report.
-8. Allows the user to manage database orders from the CLI or GUI.
-9. Records each real status transition in the same transaction as the update.
-10. Allows retrieving status history in chronological order.
-11. Allows filtering and sorting database orders without modifying them.
-12. Allows exporting database orders to CSV.
+2. Reads and normalizes orders from `new_orders.csv`.
+3. Validates every order without modifying the database or CSV file.
+4. Builds a preview with import counts, skipped orders, and validation reasons.
+5. Shows the preview and asks the user for confirmation.
+6. Imports only valid orders after confirmation.
+7. Skips invalid orders and generates an invalid-order report.
+8. Clears the CSV only after the confirmed import completes successfully.
+9. Allows the user to manage database orders from the CLI or GUI.
+10. Records each real status transition in the same transaction as the update.
+11. Allows retrieving status history in chronological order.
+12. Allows filtering and sorting database orders without modifying them.
+13. Allows exporting database orders to CSV.
 
 ## Validation rules
 
@@ -165,6 +174,8 @@ python3 main.py
 
 The CLI opens an interactive menu that allows importing, searching, updating, deleting, exporting, and inspecting orders.
 
+Before a CSV import, it displays the total rows, importable rows, skipped rows, grouped error counts, and the reasons attached to each invalid order. Cancelling leaves both the database and CSV unchanged. Design details are available in [`docs/csv_import_preview.md`](docs/csv_import_preview.md).
+
 ### Filter and sort database orders
 
 ```bash
@@ -200,7 +211,7 @@ The Tkinter GUI reuses the same service layer used by the CLI. It supports searc
 
 The interface groups search and creation in the left workspace column, update and deletion in the right column, and keeps database, CSV import, statistics, and output tools in separate cards. The activity panel is scrollable and expands when the window is resized.
 
-Before deleting an order, the GUI displays its code, customer, quantity, and current status. The user must explicitly confirm the permanent deletion.
+Before deleting an order, the GUI displays its code, customer, quantity, and current status. Before importing CSV orders, it displays import and skipped counts and asks for explicit confirmation.
 
 Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md). A broader manual regression checklist is available in [`docs/gui_manual_test_checklist.md`](docs/gui_manual_test_checklist.md).
 
@@ -210,7 +221,7 @@ Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md).
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, service-layer import previews, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
+The test suite covers validation rules, normalization behavior, duplicate detection, safe CSV previews and confirmation boundaries, service-layer imports, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
