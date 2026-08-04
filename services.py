@@ -29,10 +29,15 @@ def import_csv_orders(preview, confirmed=False):
     """
     Imports orders from a previously generated preview.
 
-    The operation requires explicit confirmation. Cancelling leaves both the
-    database and CSV file unchanged. The CSV is cleared only after all valid
-    orders have been processed and the invalid-order report has been created.
+    The preferred API receives the preview dictionary and requires explicit
+    confirmation. A validation-result list is accepted for compatibility with
+    the existing GUI, which calls this service only after its confirmation
+    dialog has been accepted.
     """
+
+    if isinstance(preview, list):
+        preview = build_csv_import_preview(preview)
+        confirmed = True
 
     if not confirmed:
         return {
