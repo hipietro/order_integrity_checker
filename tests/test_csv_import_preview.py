@@ -123,6 +123,23 @@ class TestSafeCsvImportService(unittest.TestCase):
         mock_clear.assert_called_once_with()
 
     @patch("services.clear_csv_orders")
+    @patch("services.generate_invalid_orders_report", return_value=1)
+    @patch("services.insert_order_into_database")
+    def test_confirmed_gui_validation_list_remains_supported(
+        self,
+        mock_insert,
+        mock_report,
+        mock_clear,
+    ):
+        result = services.import_csv_orders(self.preview["validation_results"])
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["csv_cleared"])
+        mock_insert.assert_called_once()
+        mock_report.assert_called_once()
+        mock_clear.assert_called_once()
+
+    @patch("services.clear_csv_orders")
     @patch("services.generate_invalid_orders_report")
     @patch(
         "services.insert_order_into_database",
