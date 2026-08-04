@@ -1,4 +1,5 @@
 from config import EXPORT_FILE_NAME
+from csv_import_preview import build_csv_import_preview
 from csv_manager import clear_csv_orders, export_orders_to_csv
 from database import (
     delete_order_from_database,
@@ -18,89 +19,101 @@ from validator import (
 
 
 def preview_csv_import():
-    """
-    Validates all CSV orders before importing them.
-
-    Returns a summary containing:
-    - all validation results
-    - number of valid orders
-    - number of invalid orders
-    """
+    """Validates CSV orders and returns a detailed, read-only preview."""
 
     validation_results = validate_all_csv_orders()
-
-    valid_orders = 0
-    invalid_orders = 0
-
-    for result in validation_results:
-        if len(result["errors"]) == 0:
-            valid_orders = valid_orders + 1
-        else:
-            invalid_orders = invalid_orders + 1
-
-    return {
-        "validation_results": validation_results,
-        "valid_orders": valid_orders,
-        "invalid_orders": invalid_orders
-    }
+    return build_csv_import_preview(validation_results)
 
 
-def import_csv_orders(validation_results):
+def import_csv_orders(preview, confirmed=False):
     """
-    Imports valid CSV orders into the database.
+    Imports orders from a previously generated preview.
 
-    Invalid orders are skipped, a report is generated, and the CSV file is cleared
-    after the import process is completed.
+    The operation requires explicit confirmation. Cancelling leaves both the
+    database and CSV file unchanged. The CSV is cleared only after all valid
+    orders have been processed and the invalid-order report has been created.
     """
+
+    if not confirmed:
+        return {
+            "success": False,
+            "cancelled": True,
+            "saved_orders": [],
+            "skipped_orders": preview.get("orders_to_skip", []),
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": "CSV import cancelled. No data was modified."
+        }
+
+    validation_results = preview.get("validation_results", [])
+
+    if len(validation_results) == 0:
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": [],
+            "skipped_orders": [],
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": "No CSV orders are available to import."
+        }
 
     saved_orders = []
     skipped_orders = []
 
-    for result in validation_results:
-        order = result["order"]
-        errors = result["errors"]
+    try:
+        for result in validation_results:
+            order = result["order"]
+            errors = result["errors"]
 
-        if len(errors) == 0:
-            insert_order_into_database(order)
-            saved_orders.append(order)
-        else:
-            skipped_orders.append({
-                "order": order,
-                "errors": errors
-            })
+            if len(errors) == 0:
+                insert_order_into_database(order)
+                saved_orders.append(order)
+            else:
+                skipped_orders.append({
+                    "order": order,
+                    "errors": list(errors)
+                })
 
-    invalid_report_count = generate_invalid_orders_report(validation_results)
-    clear_csv_orders()
+        invalid_report_count = generate_invalid_orders_report(validation_results)
+        clear_csv_orders()
+    except Exception as error:
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": saved_orders,
+            "skipped_orders": skipped_orders,
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": f"CSV import failed: {error}"
+        }
 
     return {
+        "success": True,
+        "cancelled": False,
         "saved_orders": saved_orders,
         "skipped_orders": skipped_orders,
         "invalid_report_count": invalid_report_count,
-        "csv_cleared": True
+        "csv_cleared": True,
+        "message": "CSV import completed successfully."
     }
 
 
 def get_database_orders():
-    """
-    Returns all orders stored in the database.
-    """
+    """Returns all orders stored in the database."""
 
     return get_all_orders()
 
 
 def search_order(order_code):
-    """
-    Searches an order by code.
-    """
+    """Searches an order by code."""
 
     normalized_code = normalize_order_code(order_code)
     return get_order_by_code(normalized_code)
 
 
 def create_order(order):
-    """
-    Validates and inserts a manually created order into the database.
-    """
+    """Validates and inserts a manually created order into the database."""
 
     normalized_order = normalize_order(order)
     errors = validate_order(normalized_order, [])
@@ -122,17 +135,13 @@ def create_order(order):
 
 
 def get_statistics():
-    """
-    Returns database order statistics grouped by status.
-    """
+    """Returns database order statistics grouped by status."""
 
     return get_order_statistics()
 
 
 def update_order_status(order_code, new_status):
-    """
-    Updates the status of an existing order.
-    """
+    """Updates the status of an existing order."""
 
     normalized_code = normalize_order_code(order_code)
     normalized_status = normalize_status(new_status)
@@ -196,12 +205,9 @@ def get_order_status_history(order_code):
 
 
 def delete_order(order_code):
-    """
-    Deletes an existing order from the database.
-    """
+    """Deletes an existing order from the database."""
 
     normalized_code = normalize_order_code(order_code)
-
     order = get_order_by_code(normalized_code)
 
     if order is None:
@@ -225,9 +231,7 @@ def delete_order(order_code):
 
 
 def clear_csv_input():
-    """
-    Clears the CSV input file while keeping its header.
-    """
+    """Clears the CSV input file while keeping its header."""
 
     clear_csv_orders()
 
@@ -238,11 +242,7 @@ def clear_csv_input():
 
 
 def export_database_orders():
-    """
-    Exports all database orders to a CSV file.
-
-    This function is reusable by both the CLI and GUI.
-    """
+    """Exports all database orders to a CSV file."""
 
     orders = get_all_orders()
     exported_orders = export_orders_to_csv(orders)
