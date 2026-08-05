@@ -8,7 +8,7 @@ def normalize_text(value):
     if value is None:
         return ""
 
-    return value.strip()
+    return str(value).strip()
 
 
 def normalize_order_code(order_code):
@@ -31,6 +31,18 @@ def normalize_status(status):
     return normalize_text(status).lower()
 
 
+def normalize_customer_name(customer_name):
+    """Returns a readable customer name with repeated spaces removed."""
+
+    return " ".join(normalize_text(customer_name).split())
+
+
+def normalize_customer_key(customer_name):
+    """Returns the case-insensitive key used to identify duplicate customers."""
+
+    return normalize_customer_name(customer_name).casefold()
+
+
 def normalize_order(order):
     """
     Normalizes all relevant fields of an order.
@@ -41,7 +53,9 @@ def normalize_order(order):
 
     return {
         "order_code": normalize_order_code(order.get("order_code", "")),
-        "customer_name": normalize_text(order.get("customer_name", "")),
+        "customer_name": normalize_customer_name(
+            order.get("customer_name", "")
+        ),
         "quantity": normalize_text(order.get("quantity", "")),
         "status": normalize_status(order.get("status", ""))
     }
