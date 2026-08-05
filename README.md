@@ -14,7 +14,8 @@ It is intentionally simple, but it focuses on realistic software development con
 
 - input validation
 - CSV processing
-- SQLite persistence
+- relational SQLite persistence
+- automatic schema migration
 - transactional audit history
 - service-layer separation
 - CLI interaction
@@ -34,7 +35,13 @@ It is intentionally simple, but it focuses on realistic software development con
 - Validate required fields
 - Detect duplicated order codes inside the CSV file
 - Detect orders already existing in the database
-- Normalize order codes and statuses
+- Normalize order codes, statuses, and customer names
+- Store customers separately from orders
+- Link orders to customers through `customer_id`
+- Avoid duplicate customers with case-insensitive normalized names
+- Migrate existing databases from the legacy embedded-customer schema
+- List and search customers through reusable services
+- Inspect customers from a dedicated CLI
 - Save valid orders into SQLite
 - Skip invalid orders and generate a report
 - Search orders by code
@@ -78,6 +85,7 @@ order_integrity_checker/
 │
 ├── docs/
 │   ├── csv_import_preview.md
+│   ├── customer_management.md
 │   ├── gui_layout.md
 │   ├── gui_manual_test_checklist.md
 │   └── status_history.md
@@ -85,6 +93,7 @@ order_integrity_checker/
 ├── tests/
 │   ├── __init__.py
 │   ├── test_csv_import_preview.py
+│   ├── test_customer_management.py
 │   ├── test_order_query_service.py
 │   ├── test_order_update_services.py
 │   ├── test_services.py
@@ -95,6 +104,7 @@ order_integrity_checker/
 ├── config.py
 ├── csv_import_preview.py
 ├── csv_manager.py
+├── customer_browser_cli.py
 ├── database.py
 ├── gui.py
 ├── main.py
@@ -118,19 +128,29 @@ Generated files such as `orders.db`, `invalid_orders_report.txt`, and `exported_
 
 The application follows this workflow:
 
-1. Creates a local SQLite database if it does not already exist.
-2. Reads and normalizes orders from `new_orders.csv`.
-3. Validates every order without modifying the database or CSV file.
-4. Builds a preview with import counts, skipped orders, and validation reasons.
-5. Shows the preview and asks the user for confirmation.
-6. Imports only valid orders after confirmation.
-7. Skips invalid orders and generates an invalid-order report.
-8. Clears the CSV only after the confirmed import completes successfully.
-9. Allows the user to manage database orders from the CLI or GUI.
-10. Records each real status transition in the same transaction as the update.
-11. Allows retrieving status history in chronological order.
-12. Allows filtering and sorting database orders without modifying them.
-13. Allows exporting database orders to CSV.
+1. Creates the SQLite database and migrates a legacy orders table when necessary.
+2. Stores unique normalized customers in the `customers` table.
+3. Links each order to a customer through `orders.customer_id`.
+4. Reads and normalizes orders from `new_orders.csv`.
+5. Validates every order without modifying the database or CSV file.
+6. Builds a preview with import counts, skipped orders, and validation reasons.
+7. Shows the preview and asks the user for confirmation.
+8. Imports only valid orders after confirmation, reusing existing customers.
+9. Skips invalid orders and generates an invalid-order report.
+10. Clears the CSV only after the confirmed import completes successfully.
+11. Allows the user to manage database orders from the CLI or GUI.
+12. Records each real status transition in the same transaction as the update.
+13. Allows retrieving status history in chronological order.
+14. Allows filtering and sorting database orders without modifying them.
+15. Allows exporting database orders to CSV.
+
+## Customer data model
+
+Customer names are not duplicated inside the orders table. Each order stores a `customer_id` that references the `customers` table.
+
+Names are normalized by removing extra spaces and generating a case-insensitive key. Values such as `Mario Rossi`, ` mario   rossi `, and `MARIO ROSSI` therefore reuse the same customer record.
+
+Existing databases using the old `orders.customer_name` column are migrated automatically when `create_database()` runs. Details are available in [`docs/customer_management.md`](docs/customer_management.md).
 
 ## Validation rules
 
@@ -175,6 +195,14 @@ python3 main.py
 The CLI opens an interactive menu that allows importing, searching, updating, deleting, exporting, and inspecting orders.
 
 Before a CSV import, it displays the total rows, importable rows, skipped rows, grouped error counts, and the reasons attached to each invalid order. Cancelling leaves both the database and CSV unchanged. Design details are available in [`docs/csv_import_preview.md`](docs/csv_import_preview.md).
+
+### Browse customers
+
+```bash
+python3 customer_browser_cli.py
+```
+
+Enter a complete or partial customer name. Leave the field empty to list every customer. Search is case-insensitive and uses the normalized customer key.
 
 ### Filter and sort database orders
 
@@ -221,7 +249,7 @@ Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md).
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, safe CSV previews and confirmation boundaries, service-layer imports, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
+The test suite covers validation rules, normalization behavior, duplicate detection, safe CSV previews and confirmation boundaries, customer creation and legacy migration, service-layer imports, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
