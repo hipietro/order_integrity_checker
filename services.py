@@ -3,18 +3,25 @@ from csv_import_preview import build_csv_import_preview
 from csv_manager import clear_csv_orders, export_orders_to_csv
 from database import (
     delete_order_from_database,
+    get_all_customers,
     get_all_orders,
     get_order_by_code,
     get_order_statistics,
     get_status_history_for_order,
     insert_order_into_database,
-    update_order_status_in_database
+    search_customers_by_name,
+    update_order_status_in_database,
 )
-from normalizer import normalize_order, normalize_order_code, normalize_status
+from normalizer import (
+    normalize_customer_name,
+    normalize_order,
+    normalize_order_code,
+    normalize_status,
+)
 from validator import (
     generate_invalid_orders_report,
     validate_all_csv_orders,
-    validate_order
+    validate_order,
 )
 
 
@@ -29,10 +36,10 @@ def import_csv_orders(preview, confirmed=False):
     """
     Imports orders from a previously generated preview.
 
+    Valid orders are linked to normalized customers by the database layer.
     The preferred API receives the preview dictionary and requires explicit
     confirmation. A validation-result list is accepted for compatibility with
-    the existing GUI, which calls this service only after its confirmation
-    dialog has been accepted.
+    the existing GUI, which calls this service after its confirmation dialog.
     """
 
     if isinstance(preview, list):
@@ -47,7 +54,7 @@ def import_csv_orders(preview, confirmed=False):
             "skipped_orders": preview.get("orders_to_skip", []),
             "invalid_report_count": 0,
             "csv_cleared": False,
-            "message": "CSV import cancelled. No data was modified."
+            "message": "CSV import cancelled. No data was modified.",
         }
 
     validation_results = preview.get("validation_results", [])
@@ -60,7 +67,7 @@ def import_csv_orders(preview, confirmed=False):
             "skipped_orders": [],
             "invalid_report_count": 0,
             "csv_cleared": False,
-            "message": "No CSV orders are available to import."
+            "message": "No CSV orders are available to import.",
         }
 
     saved_orders = []
@@ -77,10 +84,12 @@ def import_csv_orders(preview, confirmed=False):
             else:
                 skipped_orders.append({
                     "order": order,
-                    "errors": list(errors)
+                    "errors": list(errors),
                 })
 
-        invalid_report_count = generate_invalid_orders_report(validation_results)
+        invalid_report_count = generate_invalid_orders_report(
+            validation_results
+        )
         clear_csv_orders()
     except Exception as error:
         return {
@@ -90,7 +99,7 @@ def import_csv_orders(preview, confirmed=False):
             "skipped_orders": skipped_orders,
             "invalid_report_count": 0,
             "csv_cleared": False,
-            "message": f"CSV import failed: {error}"
+            "message": f"CSV import failed: {error}",
         }
 
     return {
@@ -100,7 +109,7 @@ def import_csv_orders(preview, confirmed=False):
         "skipped_orders": skipped_orders,
         "invalid_report_count": invalid_report_count,
         "csv_cleared": True,
-        "message": "CSV import completed successfully."
+        "message": "CSV import completed successfully.",
     }
 
 
@@ -108,6 +117,23 @@ def get_database_orders():
     """Returns all orders stored in the database."""
 
     return get_all_orders()
+
+
+def list_customers():
+    """Returns all customers in normalized alphabetical order."""
+
+    return get_all_customers()
+
+
+def search_customers(customer_name):
+    """Searches customers by complete or partial normalized name."""
+
+    normalized_name = normalize_customer_name(customer_name)
+
+    if normalized_name == "":
+        return get_all_customers()
+
+    return search_customers_by_name(normalized_name)
 
 
 def search_order(order_code):
@@ -118,7 +144,9 @@ def search_order(order_code):
 
 
 def create_order(order):
-    """Validates and inserts a manually created order into the database."""
+    """
+    Validates and inserts an order linked to a normalized customer.
+    """
 
     normalized_order = normalize_order(order)
     errors = validate_order(normalized_order, [])
@@ -127,7 +155,7 @@ def create_order(order):
         return {
             "success": False,
             "order": normalized_order,
-            "errors": errors
+            "errors": errors,
         }
 
     insert_order_into_database(normalized_order)
@@ -135,7 +163,7 @@ def create_order(order):
     return {
         "success": True,
         "order": normalized_order,
-        "errors": []
+        "errors": [],
     }
 
 
@@ -156,20 +184,23 @@ def update_order_status(order_code, new_status):
     if order is None:
         return {
             "success": False,
-            "message": f"No order found with code {normalized_code}."
+            "message": f"No order found with code {normalized_code}.",
         }
 
-    updated = update_order_status_in_database(normalized_code, normalized_status)
+    updated = update_order_status_in_database(
+        normalized_code,
+        normalized_status,
+    )
 
     if updated:
         return {
             "success": True,
-            "message": f"Order {normalized_code} updated successfully."
+            "message": f"Order {normalized_code} updated successfully.",
         }
 
     return {
         "success": False,
-        "message": f"Order {normalized_code} could not be updated."
+        "message": f"Order {normalized_code} could not be updated.",
     }
 
 
@@ -192,7 +223,10 @@ def get_order_status_history(order_code):
             "order_code": normalized_code,
             "current_status": None,
             "history": [],
-            "message": f"No order or status history found for code {normalized_code}."
+            "message": (
+                "No order or status history found for code "
+                f"{normalized_code}."
+            ),
         }
 
     current_status = None
@@ -205,7 +239,10 @@ def get_order_status_history(order_code):
         "order_code": normalized_code,
         "current_status": current_status,
         "history": history,
-        "message": f"Found {len(history)} status changes for order {normalized_code}."
+        "message": (
+            f"Found {len(history)} status changes for order "
+            f"{normalized_code}."
+        ),
     }
 
 
@@ -218,7 +255,7 @@ def delete_order(order_code):
     if order is None:
         return {
             "success": False,
-            "message": f"No order found with code {normalized_code}."
+            "message": f"No order found with code {normalized_code}.",
         }
 
     deleted = delete_order_from_database(normalized_code)
@@ -226,12 +263,12 @@ def delete_order(order_code):
     if deleted:
         return {
             "success": True,
-            "message": f"Order {normalized_code} deleted successfully."
+            "message": f"Order {normalized_code} deleted successfully.",
         }
 
     return {
         "success": False,
-        "message": f"Order {normalized_code} could not be deleted."
+        "message": f"Order {normalized_code} could not be deleted.",
     }
 
 
@@ -242,7 +279,7 @@ def clear_csv_input():
 
     return {
         "success": True,
-        "message": "CSV file cleared successfully."
+        "message": "CSV file cleared successfully.",
     }
 
 
@@ -255,5 +292,5 @@ def export_database_orders():
     return {
         "success": True,
         "exported_orders": exported_orders,
-        "file_name": EXPORT_FILE_NAME
+        "file_name": EXPORT_FILE_NAME,
     }
