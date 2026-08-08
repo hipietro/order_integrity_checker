@@ -3,3 +3,9 @@ __pycache__/
 exported_orders.csv
 orders.db
 .DS_Store
+
+# Development quality tools
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
