@@ -1,6 +1,6 @@
 # Order Integrity Checker
 
-![Run tests](https://github.com/hipietro/order_integrity_checker/actions/workflows/tests.yml/badge.svg)
+![Quality checks](https://github.com/hipietro/order_integrity_checker/actions/workflows/tests.yml/badge.svg)
 
 Order Integrity Checker is a small Python application that validates, imports, manages, and exports business orders stored in a local SQLite database.
 
@@ -22,6 +22,8 @@ It is intentionally simple, but it focuses on realistic software development con
 - responsive Tkinter GUI
 - reusable interface components
 - automated unit testing
+- automated linting
+- test coverage enforcement
 - GitHub Actions CI
 
 ## Features
@@ -61,18 +63,26 @@ It is intentionally simple, but it focuses on realistic software development con
 - Display results in a scrollable activity panel
 - Show operation feedback in a status bar
 - Export database orders to CSV
-- Run automated tests locally and on GitHub Actions
+- Run automated linting and tests on GitHub Actions
+- Enforce a minimum coverage threshold on core non-GUI modules
 
 ## Technologies used
+
+Runtime:
 
 - Python
 - SQLite
 - CSV
 - Tkinter and ttk
 - unittest
+
+Development quality tooling:
+
+- Ruff
+- Coverage.py
 - GitHub Actions
 
-No external Python libraries are required.
+The application itself has no third-party runtime dependency. Ruff and Coverage.py are development-only tools.
 
 ## Project structure
 
@@ -118,11 +128,13 @@ order_integrity_checker/
 ├── ui_components.py
 ├── ui_config.py
 ├── validator.py
+├── pyproject.toml
+├── requirements-dev.txt
 ├── README.md
 └── .gitignore
 ```
 
-Generated files such as `orders.db`, `invalid_orders_report.txt`, and `exported_orders.csv` are ignored by Git.
+Generated application files such as `orders.db`, `invalid_orders_report.txt`, and `exported_orders.csv` are ignored by Git. Development artifacts such as `.coverage`, `htmlcov/`, and `.ruff_cache/` are ignored as well.
 
 ## How it works
 
@@ -243,7 +255,36 @@ Before deleting an order, the GUI displays its code, customer, quantity, and cur
 
 Layout documentation is available in [`docs/gui_layout.md`](docs/gui_layout.md). A broader manual regression checklist is available in [`docs/gui_manual_test_checklist.md`](docs/gui_manual_test_checklist.md).
 
-## How to run tests
+## Development quality checks
+
+Install the development-only tools:
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+```
+
+Run the linter:
+
+```bash
+python3 -m ruff check .
+```
+
+Format Python files with the configured formatter:
+
+```bash
+python3 -m ruff format .
+```
+
+Run the complete test suite with branch coverage:
+
+```bash
+python3 -m coverage run -m unittest discover -s tests -v
+python3 -m coverage report
+```
+
+Coverage is enforced at **70%** for the core non-GUI modules configured in `pyproject.toml`. Interactive Tkinter and CLI entry-point code is intentionally outside this threshold because it requires a different testing strategy.
+
+## How to run tests without coverage
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -253,7 +294,12 @@ The test suite covers validation rules, normalization behavior, duplicate detect
 
 ## Continuous integration
 
-This repository includes a GitHub Actions workflow that runs the unit tests automatically on every push and pull request.
+The GitHub Actions workflow runs on every push and pull request. It:
+
+1. installs the development quality tools
+2. runs Ruff lint checks
+3. executes the full unit-test suite under Coverage.py
+4. fails if core-module coverage falls below the configured threshold
 
 Workflow file:
 
