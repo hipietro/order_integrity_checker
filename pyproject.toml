@@ -1,0 +1,35 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "backups",
+]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_covered = true
+precision = 1
+include = [
+    "database.py",
+    "services.py",
+    "validator.py",
+    "normalizer.py",
+    "csv_import_preview.py",
+    "order_query_service.py",
+]
