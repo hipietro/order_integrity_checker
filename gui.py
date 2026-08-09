@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
 from config import VALID_STATUSES
+from customer_view import open_customer_browser
 from database import create_database, insert_sample_orders
 from services import (
     create_order,
@@ -29,12 +30,7 @@ from ui_config import (
 
 
 class OrderIntegrityCheckerGUI:
-    """
-    Graphical interface for the Order Integrity Checker project.
-
-    The GUI delegates business operations to the service layer and keeps
-    database, CSV, normalization and validation logic outside the widgets.
-    """
+    """Graphical interface for the Order Integrity Checker project."""
 
     def __init__(self, root):
         self.root = root
@@ -43,6 +39,7 @@ class OrderIntegrityCheckerGUI:
         self.root.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
         self.status_message = tk.StringVar(value="Ready")
+        self.customer_browser = None
         self.create_widgets()
 
     def create_widgets(self):
@@ -57,12 +54,11 @@ class OrderIntegrityCheckerGUI:
         main_frame.rowconfigure(1, weight=1)
         main_frame.rowconfigure(3, weight=2)
 
-        header = ttk.Label(
+        ttk.Label(
             main_frame,
             text=WINDOW_TITLE,
             font=("Arial", 20, "bold"),
-        )
-        header.grid(row=0, column=0, sticky="w", pady=(0, OUTER_PADDING))
+        ).grid(row=0, column=0, sticky="w", pady=(0, OUTER_PADDING))
 
         workspace = ttk.Frame(main_frame)
         workspace.grid(row=1, column=0, sticky="nsew")
@@ -355,7 +351,7 @@ class OrderIntegrityCheckerGUI:
         )
 
     def create_action_tools(self, parent):
-        """Creates visually separated cards for database and CSV tools."""
+        """Creates action cards for database, customer and CSV tools."""
 
         tools_frame = ttk.Frame(parent)
         tools_frame.grid(
@@ -365,7 +361,7 @@ class OrderIntegrityCheckerGUI:
             pady=(OUTER_PADDING, CONTROL_PADDING),
         )
 
-        for column in range(4):
+        for column in range(5):
             tools_frame.columnconfigure(column, weight=1, uniform="tools")
 
         create_action_card(
@@ -377,24 +373,31 @@ class OrderIntegrityCheckerGUI:
         )
         create_action_card(
             tools_frame,
+            title="Customers",
+            button_text="Browse customers",
+            command=self.open_customer_management,
+            column=1,
+        )
+        create_action_card(
+            tools_frame,
             title="CSV import",
             button_text="Import orders",
             command=self.import_csv_orders,
-            column=1,
+            column=2,
         )
         create_action_card(
             tools_frame,
             title="Statistics",
             button_text="Show statistics",
             command=self.show_statistics,
-            column=2,
+            column=3,
         )
         create_action_card(
             tools_frame,
             title="Output",
             button_text="Clear output",
             command=self.clear_output,
-            column=3,
+            column=4,
         )
 
     def create_output_area(self, parent):
@@ -481,7 +484,6 @@ class OrderIntegrityCheckerGUI:
 
         if result["success"]:
             created_order = result["order"]
-
             self.write_output("Order created successfully.")
             self.write_output("")
             self.write_output(f"Code: {created_order['order_code']}")
@@ -491,11 +493,7 @@ class OrderIntegrityCheckerGUI:
 
             self.clear_create_order_form()
             self.set_status(f"Created order {created_order['order_code']}")
-
-            messagebox.showinfo(
-                "Create order",
-                "Order created successfully.",
-            )
+            messagebox.showinfo("Create order", "Order created successfully.")
             return
 
         self.write_output("Order could not be created.")
@@ -516,7 +514,6 @@ class OrderIntegrityCheckerGUI:
 
         order_code = self.update_order_code_entry.get()
         new_status = self.update_status_value.get()
-
         self.clear_output()
 
         if order_code.strip() == "":
@@ -537,22 +534,14 @@ class OrderIntegrityCheckerGUI:
         if result["success"]:
             self.update_order_code_entry.delete(0, tk.END)
             self.update_status_value.set(DEFAULT_STATUS)
-
-            messagebox.showinfo(
-                "Update order status",
-                result["message"],
-            )
+            messagebox.showinfo("Update order status", result["message"])
         else:
-            messagebox.showwarning(
-                "Update order status",
-                result["message"],
-            )
+            messagebox.showwarning("Update order status", result["message"])
 
     def delete_order_from_form(self):
         """Deletes an order after displaying a confirmation preview."""
 
         order_code = self.delete_order_code_entry.get()
-
         self.clear_output()
         self.write_output("DELETE ORDER RESULT")
         self.write_output("-------------------")
@@ -560,10 +549,7 @@ class OrderIntegrityCheckerGUI:
         if order_code.strip() == "":
             self.write_output("No order code was provided.")
             self.set_status("Deletion requires an order code")
-            messagebox.showwarning(
-                "Delete order",
-                "Please enter an order code.",
-            )
+            messagebox.showwarning("Delete order", "Please enter an order code.")
             return
 
         order = search_order(order_code)
@@ -599,16 +585,9 @@ class OrderIntegrityCheckerGUI:
         if result["success"]:
             self.delete_order_code_entry.delete(0, tk.END)
             self.delete_order_code_entry.focus_set()
-
-            messagebox.showinfo(
-                "Delete order",
-                result["message"],
-            )
+            messagebox.showinfo("Delete order", result["message"])
         else:
-            messagebox.showwarning(
-                "Delete order",
-                result["message"],
-            )
+            messagebox.showwarning("Delete order", result["message"])
 
     def show_database_orders(self):
         """Shows all orders stored in the database."""
@@ -635,13 +614,28 @@ class OrderIntegrityCheckerGUI:
 
         self.set_status(f"Displayed {len(orders)} database orders")
 
+    def open_customer_management(self):
+        """Opens or focuses the reusable customer management window."""
+
+        if (
+            self.customer_browser is not None
+            and self.customer_browser.window.winfo_exists()
+        ):
+            self.customer_browser.window.lift()
+            self.customer_browser.window.focus_force()
+            return
+
+        self.customer_browser = open_customer_browser(
+            self.root,
+            status_callback=self.set_status,
+        )
+
     def import_csv_orders(self):
         """Imports valid CSV orders using the existing service layer."""
 
         self.clear_output()
         preview = preview_csv_import()
 
-        validation_results = preview["validation_results"]
         valid_orders = preview["valid_orders"]
         invalid_orders = preview["invalid_orders"]
 
@@ -671,7 +665,7 @@ class OrderIntegrityCheckerGUI:
             self.set_status("CSV import cancelled")
             return
 
-        result = import_csv_orders(validation_results)
+        result = import_csv_orders(preview, confirmed=True)
 
         self.write_output("\nIMPORT RESULT")
         self.write_output("-------------")
@@ -712,10 +706,7 @@ class OrderIntegrityCheckerGUI:
 
         if order_code.strip() == "":
             self.set_status("Search requires an order code")
-            messagebox.showwarning(
-                "Search order",
-                "Please enter an order code.",
-            )
+            messagebox.showwarning("Search order", "Please enter an order code.")
             return
 
         order = search_order(order_code)
