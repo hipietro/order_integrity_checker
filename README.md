@@ -44,6 +44,8 @@ It is intentionally simple, but it focuses on realistic software development con
 - Migrate existing databases from the legacy embedded-customer schema
 - List and search customers through reusable services
 - Inspect customers from a dedicated CLI
+- Browse and search customers from the Tkinter GUI
+- Show customer ID, display name, normalized name, and order count
 - Save valid orders into SQLite
 - Skip invalid orders and generate a report
 - Search orders by code
@@ -59,7 +61,7 @@ It is intentionally simple, but it focuses on realistic software development con
 - Sort orders by order code or quantity
 - Choose ascending or descending sort direction
 - Use a responsive two-column GUI workspace
-- Keep search, creation, update, deletion, import, and statistics visually separated
+- Keep search, creation, update, deletion, import, customers, and statistics visually separated
 - Display results in a scrollable activity panel
 - Show operation feedback in a status bar
 - Export database orders to CSV
@@ -115,6 +117,7 @@ order_integrity_checker/
 ├── csv_import_preview.py
 ├── csv_manager.py
 ├── customer_browser_cli.py
+├── customer_view.py
 ├── database.py
 ├── gui.py
 ├── main.py
@@ -151,10 +154,11 @@ The application follows this workflow:
 9. Skips invalid orders and generates an invalid-order report.
 10. Clears the CSV only after the confirmed import completes successfully.
 11. Allows the user to manage database orders from the CLI or GUI.
-12. Records each real status transition in the same transaction as the update.
-13. Allows retrieving status history in chronological order.
-14. Allows filtering and sorting database orders without modifying them.
-15. Allows exporting database orders to CSV.
+12. Exposes customer search and order counts through CLI and GUI views.
+13. Records each real status transition in the same transaction as the update.
+14. Allows retrieving status history in chronological order.
+15. Allows filtering and sorting database orders without modifying them.
+16. Allows exporting database orders to CSV.
 
 ## Customer data model
 
@@ -163,6 +167,8 @@ Customer names are not duplicated inside the orders table. Each order stores a `
 Names are normalized by removing extra spaces and generating a case-insensitive key. Values such as `Mario Rossi`, ` mario   rossi `, and `MARIO ROSSI` therefore reuse the same customer record.
 
 Existing databases using the old `orders.customer_name` column are migrated automatically when `create_database()` runs. Details are available in [`docs/customer_management.md`](docs/customer_management.md).
+
+The customer overview service combines the customer records with the current order list and returns an order count for each customer. Both the GUI customer browser and any future interface can reuse this service without querying SQLite directly.
 
 ## Validation rules
 
@@ -249,7 +255,9 @@ python3 gui.py
 
 The Tkinter GUI reuses the same service layer used by the CLI. It supports searching, creating, updating, deleting, importing, and inspecting orders.
 
-The interface groups search and creation in the left workspace column, update and deletion in the right column, and keeps database, CSV import, statistics, and output tools in separate cards. The activity panel is scrollable and expands when the window is resized.
+The interface groups search and creation in the left workspace column, update and deletion in the right column, and keeps database, customer, CSV import, statistics, and output tools in separate cards. The activity panel is scrollable and expands when the window is resized.
+
+Use **Browse customers** to open the dedicated customer management window. It can list every customer or search by complete or partial name. The responsive table shows the customer ID, normalized display name, normalized search key, and the number of current orders linked to that customer. Customer data is loaded through the service layer rather than through SQL in the GUI.
 
 Before deleting an order, the GUI displays its code, customer, quantity, and current status. Before importing CSV orders, it displays import and skipped counts and asks for explicit confirmation.
 
@@ -290,7 +298,7 @@ Coverage is enforced at **70%** for the core non-GUI modules configured in `pypr
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite covers validation rules, normalization behavior, duplicate detection, safe CSV previews and confirmation boundaries, customer creation and legacy migration, service-layer imports, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
+The test suite covers validation rules, normalization behavior, duplicate detection, safe CSV previews and confirmation boundaries, customer creation and legacy migration, customer overview order counts, service-layer imports, manual order creation, order updates, transactional status history, retained audit history, order deletion, order filtering and sorting, CSV export behavior, and GUI configuration constraints.
 
 ## Continuous integration
 
