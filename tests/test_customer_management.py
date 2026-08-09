@@ -177,5 +177,60 @@ class TestCustomerServiceIntegration(CustomerDatabaseTestCase):
         mock_clear_csv.assert_called_once()
 
 
+class TestCustomerOverviewService(unittest.TestCase):
+    @patch("services.get_all_orders")
+    @patch("services.search_customers")
+    def test_customer_overview_counts_orders_per_customer(
+        self,
+        mock_search_customers,
+        mock_get_all_orders,
+    ):
+        mock_search_customers.return_value = [
+            {
+                "id": 1,
+                "name": "Mario Rossi",
+                "normalized_name": "mario rossi",
+            },
+            {
+                "id": 2,
+                "name": "Anna Verdi",
+                "normalized_name": "anna verdi",
+            },
+        ]
+        mock_get_all_orders.return_value = [
+            {"customer_id": 1},
+            {"customer_id": 1},
+            {"customer_id": 2},
+        ]
+
+        overview = services.get_customer_overview()
+
+        self.assertEqual(overview[0]["order_count"], 2)
+        self.assertEqual(overview[1]["order_count"], 1)
+        mock_search_customers.assert_called_once_with("")
+        mock_get_all_orders.assert_called_once_with()
+
+    @patch("services.get_all_orders", return_value=[])
+    @patch("services.search_customers")
+    def test_customer_overview_reuses_filtered_customer_search(
+        self,
+        mock_search_customers,
+        mock_get_all_orders,
+    ):
+        mock_search_customers.return_value = [{
+            "id": 7,
+            "name": "ACME Srl",
+            "normalized_name": "acme srl",
+        }]
+
+        overview = services.get_customer_overview("  acme  ")
+
+        self.assertEqual(len(overview), 1)
+        self.assertEqual(overview[0]["id"], 7)
+        self.assertEqual(overview[0]["order_count"], 0)
+        mock_search_customers.assert_called_once_with("  acme  ")
+        mock_get_all_orders.assert_called_once_with()
+
+
 if __name__ == "__main__":
     unittest.main()
