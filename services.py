@@ -136,6 +136,30 @@ def search_customers(customer_name):
     return search_customers_by_name(normalized_name)
 
 
+def get_customer_overview(customer_name=""):
+    """Returns customers enriched with their current number of orders."""
+
+    customers = search_customers(customer_name)
+    orders = get_all_orders()
+    order_counts = {}
+
+    for order in orders:
+        customer_id = order["customer_id"]
+        order_counts[customer_id] = order_counts.get(customer_id, 0) + 1
+
+    overview = []
+
+    for customer in customers:
+        overview.append({
+            "id": customer["id"],
+            "name": customer["name"],
+            "normalized_name": customer["normalized_name"],
+            "order_count": order_counts.get(customer["id"], 0),
+        })
+
+    return overview
+
+
 def search_order(order_code):
     """Searches an order by code."""
 
