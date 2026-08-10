@@ -4,10 +4,10 @@ from tkinter import messagebox, scrolledtext, ttk
 from config import VALID_STATUSES
 from customer_view import open_customer_browser
 from database import create_database, insert_sample_orders
+from order_view import open_order_browser, open_order_detail
 from services import (
     create_order,
     delete_order,
-    get_database_orders,
     get_statistics,
     import_csv_orders,
     preview_csv_import,
@@ -40,6 +40,7 @@ class OrderIntegrityCheckerGUI:
 
         self.status_message = tk.StringVar(value="Ready")
         self.customer_browser = None
+        self.order_browser = None
         self.create_widgets()
 
     def create_widgets(self):
@@ -123,7 +124,7 @@ class OrderIntegrityCheckerGUI:
 
         ttk.Button(
             search_frame,
-            text="Search",
+            text="Search and open details",
             width=BUTTON_WIDTH,
             command=self.search_order_by_code,
         ).grid(
@@ -367,7 +368,7 @@ class OrderIntegrityCheckerGUI:
         create_action_card(
             tools_frame,
             title="Database",
-            button_text="Show orders",
+            button_text="Browse orders",
             command=self.show_database_orders,
             column=0,
         )
@@ -590,29 +591,21 @@ class OrderIntegrityCheckerGUI:
             messagebox.showwarning("Delete order", result["message"])
 
     def show_database_orders(self):
-        """Shows all orders stored in the database."""
+        """Opens or focuses the interactive database order browser."""
 
-        self.clear_output()
-        orders = get_database_orders()
-
-        self.write_output("DATABASE ORDERS")
-        self.write_output("---------------")
-
-        if len(orders) == 0:
-            self.write_output("No orders found in the database.")
-            self.set_status("Database contains no orders")
+        if (
+            self.order_browser is not None
+            and self.order_browser.window.winfo_exists()
+        ):
+            self.order_browser.refresh_orders()
+            self.order_browser.window.lift()
+            self.order_browser.window.focus_force()
             return
 
-        for order in orders:
-            self.write_output(
-                f"ID: {order['id']} | "
-                f"Code: {order['order_code']} | "
-                f"Customer: {order['customer_name']} | "
-                f"Quantity: {order['quantity']} | "
-                f"Status: {order['status']}"
-            )
-
-        self.set_status(f"Displayed {len(orders)} database orders")
+        self.order_browser = open_order_browser(
+            self.root,
+            status_callback=self.set_status,
+        )
 
     def open_customer_management(self):
         """Opens or focuses the reusable customer management window."""
@@ -699,7 +692,7 @@ class OrderIntegrityCheckerGUI:
         )
 
     def search_order_by_code(self):
-        """Searches a database order by order code."""
+        """Searches an order and opens its unified detail view."""
 
         order_code = self.search_entry.get()
         self.clear_output()
@@ -725,10 +718,13 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Quantity: {order['quantity']}")
         self.write_output(f"Status: {order['status']}")
         self.write_output("")
-        self.write_output(
-            "The order code is normalized automatically before searching."
+        self.write_output("Opening the unified order detail view.")
+
+        open_order_detail(
+            self.root,
+            order["order_code"],
+            status_callback=self.set_status,
         )
-        self.set_status(f"Found order {order['order_code']}")
 
     def show_statistics(self):
         """Shows database order statistics."""
