@@ -167,6 +167,44 @@ def search_order(order_code):
     return get_order_by_code(normalized_code)
 
 
+def get_order_detail(order_code):
+    """Returns one complete order detail object for presentation layers."""
+
+    normalized_code = normalize_order_code(order_code)
+    order = get_order_by_code(normalized_code)
+
+    if order is None:
+        return {
+            "success": False,
+            "order_code": normalized_code,
+            "order": None,
+            "customer": None,
+            "status_history": [],
+            "insights": {},
+            "message": f"No order found with code {normalized_code}.",
+        }
+
+    history = get_status_history_for_order(normalized_code)
+
+    return {
+        "success": True,
+        "order_code": normalized_code,
+        "order": {
+            "id": order["id"],
+            "order_code": order["order_code"],
+            "quantity": order["quantity"],
+            "status": order["status"],
+        },
+        "customer": {
+            "id": order["customer_id"],
+            "name": order["customer_name"],
+        },
+        "status_history": history,
+        "insights": {},
+        "message": f"Order {normalized_code} details loaded successfully.",
+    }
+
+
 def create_order(order):
     """
     Validates and inserts an order linked to a normalized customer.
