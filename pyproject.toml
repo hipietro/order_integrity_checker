@@ -32,4 +32,5 @@ include = [
     "normalizer.py",
     "csv_import_preview.py",
     "order_query_service.py",
+    "duplicate_detector.py",
 ]
