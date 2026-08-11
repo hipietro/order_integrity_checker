@@ -12,6 +12,7 @@ from database import (
     search_customers_by_name,
     update_order_status_in_database,
 )
+from duplicate_detector import find_suspicious_duplicates
 from normalizer import (
     normalize_customer_name,
     normalize_order,
@@ -167,6 +168,16 @@ def search_order(order_code):
     return get_order_by_code(normalized_code)
 
 
+def get_suspicious_duplicate_review(order):
+    """Returns explained possible duplicates without rejecting the order."""
+
+    matches = find_suspicious_duplicates(order, get_all_orders())
+    return {
+        "review_required": len(matches) > 0,
+        "matches": matches,
+    }
+
+
 def get_order_detail(order_code):
     """Returns one complete order detail object for presentation layers."""
 
@@ -185,6 +196,7 @@ def get_order_detail(order_code):
         }
 
     history = get_status_history_for_order(normalized_code)
+    duplicate_review = get_suspicious_duplicate_review(order)
 
     return {
         "success": True,
@@ -200,7 +212,9 @@ def get_order_detail(order_code):
             "name": order["customer_name"],
         },
         "status_history": history,
-        "insights": {},
+        "insights": {
+            "suspicious_duplicate": duplicate_review,
+        },
         "message": f"Order {normalized_code} details loaded successfully.",
     }
 
