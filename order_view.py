@@ -25,8 +25,8 @@ class OrderDetailWindow:
 
         self.window = tk.Toplevel(parent)
         self.window.title(f"Order {self.detail['order_code']}")
-        self.window.geometry("760x560")
-        self.window.minsize(620, 440)
+        self.window.geometry("820x660")
+        self.window.minsize(680, 520)
 
         self.create_widgets()
 
@@ -34,7 +34,7 @@ class OrderDetailWindow:
             self.status_callback(self.detail["message"])
 
     def create_widgets(self):
-        """Creates order, customer, history and future-insight sections."""
+        """Creates order, customer, integrity insight and history sections."""
 
         self.window.columnconfigure(0, weight=1)
         self.window.rowconfigure(0, weight=1)
@@ -101,14 +101,70 @@ class OrderDetailWindow:
             sticky="ew",
             pady=(OUTER_PADDING, CONTROL_PADDING),
         )
-        ttk.Label(
-            insights_frame,
-            text=(
-                "Reserved for quality score and suspicious-duplicate signals "
-                "in upcoming features."
-            ),
-            wraplength=680,
-        ).grid(row=0, column=0, sticky="w")
+        insights_frame.columnconfigure(0, weight=1)
+
+        duplicate_review = self.detail["insights"].get(
+            "suspicious_duplicate",
+            {"review_required": False, "matches": []},
+        )
+        matches = duplicate_review["matches"]
+
+        if not duplicate_review["review_required"]:
+            ttk.Label(
+                insights_frame,
+                text=(
+                    "No suspicious duplicate signals detected. "
+                    "Manual duplicate review is not required."
+                ),
+                wraplength=740,
+            ).grid(row=0, column=0, sticky="w")
+        else:
+            ttk.Label(
+                insights_frame,
+                text=(
+                    f"Manual review recommended: {len(matches)} possible "
+                    "duplicate match(es) detected. The order is not rejected "
+                    "automatically."
+                ),
+                wraplength=740,
+            ).grid(
+                row=0,
+                column=0,
+                sticky="w",
+                pady=(0, CONTROL_PADDING),
+            )
+
+            columns = ("code", "customer", "quantity", "status", "reasons")
+            duplicate_table = ttk.Treeview(
+                insights_frame,
+                columns=columns,
+                show="headings",
+                height=min(max(len(matches), 1), 4),
+            )
+            duplicate_table.heading("code", text="Possible duplicate")
+            duplicate_table.heading("customer", text="Customer")
+            duplicate_table.heading("quantity", text="Qty")
+            duplicate_table.heading("status", text="Status")
+            duplicate_table.heading("reasons", text="Why it is suspicious")
+            duplicate_table.column("code", width=130, anchor="center")
+            duplicate_table.column("customer", width=170, anchor="w")
+            duplicate_table.column("quantity", width=60, anchor="center")
+            duplicate_table.column("status", width=90, anchor="center")
+            duplicate_table.column("reasons", width=300, anchor="w")
+            duplicate_table.grid(row=1, column=0, sticky="ew")
+
+            for match in matches:
+                duplicate_table.insert(
+                    "",
+                    tk.END,
+                    values=(
+                        match["order_code"],
+                        match["customer_name"],
+                        match["quantity"],
+                        match["status"],
+                        " ".join(match["reasons"]),
+                    ),
+                )
 
         history_frame = ttk.LabelFrame(
             main_frame,
