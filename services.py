@@ -19,6 +19,7 @@ from normalizer import (
     normalize_order_code,
     normalize_status,
 )
+from quality_scorer import calculate_order_quality_score
 from validator import (
     generate_invalid_orders_report,
     validate_all_csv_orders,
@@ -26,11 +27,40 @@ from validator import (
 )
 
 
+def _score_csv_validation_results(validation_results):
+    """Returns validation results enriched with explainable quality scores."""
+
+    database_orders = get_all_orders()
+    csv_orders = [result["order"] for result in validation_results]
+    scored_results = []
+
+    for index, result in enumerate(validation_results):
+        peer_csv_orders = [
+            order
+            for peer_index, order in enumerate(csv_orders)
+            if peer_index != index
+        ]
+        candidates = database_orders + peer_csv_orders
+        quality = calculate_order_quality_score(
+            result["order"],
+            validation_errors=result["errors"],
+            candidate_orders=candidates,
+        )
+        scored_results.append({
+            "order": result["order"],
+            "errors": list(result["errors"]),
+            "quality": quality,
+        })
+
+    return scored_results
+
+
 def preview_csv_import():
-    """Validates CSV orders and returns a detailed, read-only preview."""
+    """Validates and scores CSV orders without modifying stored data."""
 
     validation_results = validate_all_csv_orders()
-    return build_csv_import_preview(validation_results)
+    scored_results = _score_csv_validation_results(validation_results)
+    return build_csv_import_preview(scored_results)
 
 
 def import_csv_orders(preview, confirmed=False):
