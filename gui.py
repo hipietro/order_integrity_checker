@@ -624,7 +624,7 @@ class OrderIntegrityCheckerGUI:
         )
 
     def import_csv_orders(self):
-        """Imports valid CSV orders using the existing service layer."""
+        """Previews quality and imports confirmed valid CSV orders."""
 
         self.clear_output()
         preview = preview_csv_import()
@@ -637,6 +637,33 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Valid orders ready to import: {valid_orders}")
         self.write_output(f"Invalid orders found: {invalid_orders}")
 
+        if preview["average_quality_score"] is not None:
+            self.write_output(
+                f"Average quality score: {preview['average_quality_score']}/100"
+            )
+            self.write_output(
+                "Orders recommended for review: "
+                f"{preview['review_recommended_orders']}"
+            )
+            self.write_output("")
+            self.write_output("ORDER QUALITY")
+            self.write_output("-------------")
+
+            for item in preview["validation_results"]:
+                order = item["order"]
+                quality = item.get("quality")
+
+                if quality is None:
+                    continue
+
+                code = order["order_code"] or "[missing code]"
+                self.write_output(
+                    f"{code}: {quality['score']}/100 ({quality['rating']})"
+                )
+                for explanation in quality["explanations"]:
+                    self.write_output(f"  - {explanation}")
+                self.write_output("")
+
         if valid_orders == 0 and invalid_orders == 0:
             self.set_status("CSV file contains no orders")
             messagebox.showinfo(
@@ -645,10 +672,19 @@ class OrderIntegrityCheckerGUI:
             )
             return
 
+        quality_summary = ""
+        if preview["average_quality_score"] is not None:
+            quality_summary = (
+                f"\nAverage quality: {preview['average_quality_score']}/100\n"
+                "Recommended for review: "
+                f"{preview['review_recommended_orders']}\n"
+            )
+
         confirmed = messagebox.askyesno(
             "Confirm import",
             "Valid orders will be imported into the database.\n"
             "Invalid orders will be skipped and reported.\n"
+            f"{quality_summary}"
             "The CSV file will be cleared after import.\n\n"
             "Do you want to continue?",
         )
