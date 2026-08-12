@@ -33,4 +33,5 @@ include = [
     "csv_import_preview.py",
     "order_query_service.py",
     "duplicate_detector.py",
+    "quality_scorer.py",
 ]
