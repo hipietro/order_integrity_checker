@@ -25,8 +25,8 @@ class OrderDetailWindow:
 
         self.window = tk.Toplevel(parent)
         self.window.title(f"Order {self.detail['order_code']}")
-        self.window.geometry("820x660")
-        self.window.minsize(680, 520)
+        self.window.geometry("820x700")
+        self.window.minsize(680, 540)
 
         self.create_widgets()
 
@@ -103,6 +103,31 @@ class OrderDetailWindow:
         )
         insights_frame.columnconfigure(0, weight=1)
 
+        quality = self.detail["insights"].get("quality")
+        if quality is not None:
+            ttk.Label(
+                insights_frame,
+                text=(
+                    f"Quality score: {quality['score']}/100 "
+                    f"({quality['rating']} confidence)"
+                ),
+                font=("Arial", 11, "bold"),
+            ).grid(row=0, column=0, sticky="w")
+            ttk.Label(
+                insights_frame,
+                text="\n".join(
+                    f"- {explanation}"
+                    for explanation in quality["explanations"]
+                ),
+                wraplength=740,
+                justify="left",
+            ).grid(
+                row=1,
+                column=0,
+                sticky="w",
+                pady=(CONTROL_PADDING, CONTROL_PADDING),
+            )
+
         duplicate_review = self.detail["insights"].get(
             "suspicious_duplicate",
             {"review_required": False, "matches": []},
@@ -117,7 +142,7 @@ class OrderDetailWindow:
                     "Manual duplicate review is not required."
                 ),
                 wraplength=740,
-            ).grid(row=0, column=0, sticky="w")
+            ).grid(row=2, column=0, sticky="w")
         else:
             ttk.Label(
                 insights_frame,
@@ -128,7 +153,7 @@ class OrderDetailWindow:
                 ),
                 wraplength=740,
             ).grid(
-                row=0,
+                row=2,
                 column=0,
                 sticky="w",
                 pady=(0, CONTROL_PADDING),
@@ -151,7 +176,7 @@ class OrderDetailWindow:
             duplicate_table.column("quantity", width=60, anchor="center")
             duplicate_table.column("status", width=90, anchor="center")
             duplicate_table.column("reasons", width=300, anchor="w")
-            duplicate_table.grid(row=1, column=0, sticky="ew")
+            duplicate_table.grid(row=3, column=0, sticky="ew")
 
             for match in matches:
                 duplicate_table.insert(
