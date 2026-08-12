@@ -47,7 +47,10 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
         self.assertEqual(preview["valid_orders"], 1)
         self.assertEqual(preview["invalid_orders"], 2)
         self.assertEqual(preview["orders_to_import"][0]["order_code"], "ORD010")
-        self.assertEqual(preview["orders_to_skip"][0]["order"]["order_code"], "ORD011")
+        self.assertEqual(
+            preview["orders_to_skip"][0]["order"]["order_code"],
+            "ORD011",
+        )
         self.assertTrue(preview["requires_confirmation"])
 
     def test_preview_summarizes_repeated_validation_reasons(self):
@@ -59,6 +62,31 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
 
         self.assertEqual(summary["missing customer name"], 2)
         self.assertEqual(summary["quantity must be greater than zero"], 1)
+
+    def test_preview_summarizes_quality_scores_when_available(self):
+        results = [
+            {
+                "order": self.validation_results[0]["order"],
+                "errors": [],
+                "quality": {
+                    "score": 100,
+                    "review_recommended": False,
+                },
+            },
+            {
+                "order": self.validation_results[1]["order"],
+                "errors": self.validation_results[1]["errors"],
+                "quality": {
+                    "score": 50,
+                    "review_recommended": True,
+                },
+            },
+        ]
+
+        preview = build_csv_import_preview(results)
+
+        self.assertEqual(preview["average_quality_score"], 75.0)
+        self.assertEqual(preview["review_recommended_orders"], 1)
 
 
 class TestSafeCsvImportService(unittest.TestCase):
@@ -167,7 +195,36 @@ class TestSafeCsvImportService(unittest.TestCase):
 
         self.assertEqual(preview["total_orders"], 0)
         self.assertFalse(preview["requires_confirmation"])
+        self.assertIsNone(preview["average_quality_score"])
         mock_validate.assert_called_once_with()
+
+    @patch("services.get_all_orders", return_value=[])
+    @patch("services.validate_all_csv_orders")
+    def test_preview_service_attaches_quality_to_every_order(
+        self,
+        mock_validate,
+        mock_get_orders,
+    ):
+        mock_validate.return_value = [
+            {
+                "order": {
+                    "order_code": "ORD030",
+                    "customer_name": "Mario Rossi",
+                    "quantity": "5",
+                    "status": "pending",
+                },
+                "errors": [],
+            }
+        ]
+
+        preview = services.preview_csv_import()
+
+        quality = preview["validation_results"][0]["quality"]
+        self.assertEqual(quality["score"], 100)
+        self.assertEqual(quality["rating"], "high")
+        self.assertEqual(preview["average_quality_score"], 100.0)
+        self.assertEqual(preview["review_recommended_orders"], 0)
+        mock_get_orders.assert_called_once_with()
 
 
 if __name__ == "__main__":
