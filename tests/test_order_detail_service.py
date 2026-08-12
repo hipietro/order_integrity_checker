@@ -5,14 +5,16 @@ import services
 
 
 class TestOrderDetailService(unittest.TestCase):
-    @patch("services.get_suspicious_duplicate_review")
+    @patch("services.calculate_order_quality_score")
+    @patch("services.get_all_orders")
     @patch("services.get_status_history_for_order")
     @patch("services.get_order_by_code")
     def test_order_detail_combines_order_customer_history_and_insights(
         self,
         mock_get_order,
         mock_get_history,
-        mock_duplicate_review,
+        mock_get_all_orders,
+        mock_quality_score,
     ):
         order = {
             "id": 7,
@@ -22,6 +24,23 @@ class TestOrderDetailService(unittest.TestCase):
             "quantity": 8,
             "status": "completed",
         }
+        candidates = [order]
+        duplicate_match = {
+            "order_code": "ORD07",
+            "customer_name": "Mario Rossi",
+            "quantity": 8,
+            "status": "completed",
+            "reasons": ["Order code looks like a typing variation."],
+        }
+        quality = {
+            "score": 80,
+            "rating": "medium",
+            "review_recommended": True,
+            "explanations": ["Possible duplicate detected."],
+            "penalties": [],
+            "duplicate_matches": [duplicate_match],
+        }
+
         mock_get_order.return_value = order
         mock_get_history.return_value = [
             {
@@ -32,18 +51,8 @@ class TestOrderDetailService(unittest.TestCase):
                 "changed_at": "2026-08-10 10:00:00",
             }
         ]
-        mock_duplicate_review.return_value = {
-            "review_required": True,
-            "matches": [
-                {
-                    "order_code": "ORD07",
-                    "customer_name": "Mario Rossi",
-                    "quantity": 8,
-                    "status": "completed",
-                    "reasons": ["Order code looks like a typing variation."],
-                }
-            ],
-        }
+        mock_get_all_orders.return_value = candidates
+        mock_quality_score.return_value = quality
 
         result = services.get_order_detail(" ord007 ")
 
@@ -53,6 +62,7 @@ class TestOrderDetailService(unittest.TestCase):
         self.assertEqual(result["customer"]["id"], 3)
         self.assertEqual(result["customer"]["name"], "Mario Rossi")
         self.assertEqual(len(result["status_history"]), 1)
+        self.assertEqual(result["insights"]["quality"], quality)
         self.assertTrue(
             result["insights"]["suspicious_duplicate"]["review_required"]
         )
@@ -64,16 +74,22 @@ class TestOrderDetailService(unittest.TestCase):
         )
         mock_get_order.assert_called_once_with("ORD007")
         mock_get_history.assert_called_once_with("ORD007")
-        mock_duplicate_review.assert_called_once_with(order)
+        mock_get_all_orders.assert_called_once_with()
+        mock_quality_score.assert_called_once_with(
+            order,
+            candidate_orders=candidates,
+        )
 
-    @patch("services.get_suspicious_duplicate_review")
+    @patch("services.calculate_order_quality_score")
+    @patch("services.get_all_orders")
     @patch("services.get_status_history_for_order")
     @patch("services.get_order_by_code", return_value=None)
     def test_order_detail_handles_missing_order_cleanly(
         self,
         mock_get_order,
         mock_get_history,
-        mock_duplicate_review,
+        mock_get_all_orders,
+        mock_quality_score,
     ):
         result = services.get_order_detail("missing")
 
@@ -86,7 +102,8 @@ class TestOrderDetailService(unittest.TestCase):
         self.assertEqual(result["message"], "No order found with code MISSING.")
         mock_get_order.assert_called_once_with("MISSING")
         mock_get_history.assert_not_called()
-        mock_duplicate_review.assert_not_called()
+        mock_get_all_orders.assert_not_called()
+        mock_quality_score.assert_not_called()
 
 
 if __name__ == "__main__":
