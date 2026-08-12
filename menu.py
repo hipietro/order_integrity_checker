@@ -89,14 +89,45 @@ def show_validation_problems(validation_results):
         print("No invalid orders found.")
 
 
+def show_order_quality_scores(preview):
+    """Shows the explainable quality score attached to each CSV order."""
+
+    if preview["average_quality_score"] is None:
+        return
+
+    print("\nORDER QUALITY")
+    print("-------------")
+    print(f"Average quality score: {preview['average_quality_score']}/100")
+    print(
+        "Orders recommended for review: "
+        f"{preview['review_recommended_orders']}"
+    )
+
+    for result in preview["validation_results"]:
+        order = result["order"]
+        quality = result.get("quality")
+
+        if quality is None:
+            continue
+
+        print(
+            f"\n{order['order_code'] or '[missing code]'}: "
+            f"{quality['score']}/100 ({quality['rating']})"
+        )
+        for explanation in quality["explanations"]:
+            print(f"- {explanation}")
+
+
 def show_csv_import_preview(preview):
-    """Shows counts, error totals and skipped-order reasons."""
+    """Shows counts, quality scores, error totals and skipped-order reasons."""
 
     print("\nCSV IMPORT PREVIEW")
     print("------------------")
     print(f"Total CSV orders: {preview['total_orders']}")
     print(f"Orders to import: {preview['valid_orders']}")
     print(f"Orders to skip: {preview['invalid_orders']}")
+
+    show_order_quality_scores(preview)
 
     if len(preview["error_summary"]) > 0:
         print("\nVALIDATION REASON SUMMARY")
