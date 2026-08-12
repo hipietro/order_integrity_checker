@@ -229,7 +229,14 @@ def get_order_detail(order_code):
         }
 
     history = get_status_history_for_order(normalized_code)
-    duplicate_review = get_suspicious_duplicate_review(order)
+    quality = calculate_order_quality_score(
+        order,
+        candidate_orders=get_all_orders(),
+    )
+    duplicate_review = {
+        "review_required": len(quality["duplicate_matches"]) > 0,
+        "matches": quality["duplicate_matches"],
+    }
 
     return {
         "success": True,
@@ -246,6 +253,7 @@ def get_order_detail(order_code):
         },
         "status_history": history,
         "insights": {
+            "quality": quality,
             "suspicious_duplicate": duplicate_review,
         },
         "message": f"Order {normalized_code} details loaded successfully.",
