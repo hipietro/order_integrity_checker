@@ -30,6 +30,9 @@ from validator import (
 def _score_csv_validation_results(validation_results):
     """Returns validation results enriched with explainable quality scores."""
 
+    if not validation_results:
+        return []
+
     database_orders = get_all_orders()
     csv_orders = [result["order"] for result in validation_results]
     scored_results = []
