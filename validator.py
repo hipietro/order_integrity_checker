@@ -2,27 +2,11 @@ from config import VALID_STATUSES, REPORT_FILE_NAME
 from csv_manager import read_orders_from_csv
 from database import order_exists_in_database
 from normalizer import normalize_order
+from suggestion_engine import ORDER_CODE_PATTERN, generate_order_suggestions
+
 
 def validate_order(order, order_codes_in_file):
-    """
-    Validates a single order coming from the CSV file.
-
-    The function checks:
-    - missing order code
-    - duplicated order code inside the CSV file
-    - duplicated order code in the database
-    - missing or too short customer name
-    - missing or invalid quantity
-    - unsupported order status
-
-    Parameters:
-        order: one row of the CSV file, represented as a dictionary.
-        order_codes_in_file: list of order codes already found while reading the CSV.
-
-    Returns:
-        A list of error messages.
-        If the list is empty, the order is valid.
-    """
+    """Validates a single order coming from the CSV file."""
 
     errors = []
 
@@ -34,6 +18,8 @@ def validate_order(order, order_codes_in_file):
 
     if order_code == "":
         errors.append("missing order code")
+    elif not ORDER_CODE_PATTERN.fullmatch(order_code):
+        errors.append("invalid order code format")
     elif order_code in order_codes_in_file:
         errors.append("duplicated order code inside CSV file")
     elif order_exists_in_database(order_code):
@@ -58,27 +44,21 @@ def validate_order(order, order_codes_in_file):
 
 
 def validate_all_csv_orders():
-    """
-    Validates all orders from the CSV file.
-
-    Returns:
-        A list of validation results.
-
-    Each validation result contains:
-    - the original order
-    - the list of validation errors
-    """
+    """Validates all CSV orders and enriches invalid rows with suggestions."""
 
     orders = read_orders_from_csv()
     order_codes_in_file = []
     validation_results = []
 
     for order in orders:
+        raw_order = dict(order)
         errors = validate_order(order, order_codes_in_file)
+        suggestions = generate_order_suggestions(raw_order, errors)
 
         validation_results.append({
             "order": order,
-            "errors": errors
+            "errors": errors,
+            "suggestions": suggestions,
         })
 
         order_codes_in_file.append(order["order_code"])
@@ -87,15 +67,9 @@ def validate_all_csv_orders():
 
 
 def show_invalid_orders():
-    """
-    Shows only the invalid orders found in the CSV file.
-
-    For each invalid order, the function prints the order code and the reasons
-    why the order is not valid.
-    """
+    """Shows invalid CSV orders with errors and actionable suggestions."""
 
     validation_results = validate_all_csv_orders()
-
     found_invalid_orders = False
 
     print("\nINVALID CSV ORDERS")
@@ -104,6 +78,7 @@ def show_invalid_orders():
     for result in validation_results:
         order = result["order"]
         errors = result["errors"]
+        suggestions = result.get("suggestions", [])
 
         if len(errors) > 0:
             found_invalid_orders = True
@@ -117,21 +92,21 @@ def show_invalid_orders():
             for error in errors:
                 print(f"- {error}")
 
+            if suggestions:
+                print("Suggestions:")
+                for suggestion in suggestions:
+                    print(f"- {suggestion}")
+
     if not found_invalid_orders:
         print("No invalid orders found.")
 
+
 def generate_invalid_orders_report(validation_results):
-    """
-    Generates a text report containing all invalid CSV orders and their errors.
+    """Generates a text report with invalid orders, errors, and suggestions."""
 
-    The report is regenerated every time the CSV import process runs.
-    """
-
-    invalid_orders = []
-
-    for result in validation_results:
-        if len(result["errors"]) > 0:
-            invalid_orders.append(result)
+    invalid_orders = [
+        result for result in validation_results if len(result["errors"]) > 0
+    ]
 
     with open(REPORT_FILE_NAME, "w") as file:
         file.write("INVALID ORDERS REPORT\n")
@@ -143,6 +118,7 @@ def generate_invalid_orders_report(validation_results):
             for result in invalid_orders:
                 order = result["order"]
                 errors = result["errors"]
+                suggestions = result.get("suggestions", [])
 
                 file.write(f"Order code: {order['order_code']}\n")
                 file.write(f"Customer name: {order['customer_name']}\n")
@@ -152,6 +128,11 @@ def generate_invalid_orders_report(validation_results):
 
                 for error in errors:
                     file.write(f"- {error}\n")
+
+                if suggestions:
+                    file.write("Suggestions:\n")
+                    for suggestion in suggestions:
+                        file.write(f"- {suggestion}\n")
 
                 file.write("\n")
 
