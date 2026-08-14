@@ -22,6 +22,14 @@ class TestOrderValidation(unittest.TestCase):
         self.assertEqual(errors, [])
 
     @patch("validator.order_exists_in_database", return_value=False)
+    def test_invalid_order_code_format_is_invalid(self, mock_order_exists):
+        order = self.make_order(order_code="ord-7")
+
+        errors = validate_order(order, [])
+
+        self.assertIn("invalid order code format", errors)
+
+    @patch("validator.order_exists_in_database", return_value=False)
     def test_missing_customer_name_is_invalid(self, mock_order_exists):
         order = self.make_order(customer_name="")
 
