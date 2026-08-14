@@ -10,6 +10,7 @@ def build_csv_import_preview(validation_results):
     for result in validation_results:
         order = result["order"]
         errors = list(result["errors"])
+        suggestions = list(result.get("suggestions", []))
         quality = result.get("quality")
 
         if quality is not None:
@@ -24,6 +25,7 @@ def build_csv_import_preview(validation_results):
         orders_to_skip.append({
             "order": order,
             "errors": errors,
+            "suggestions": suggestions,
         })
 
         for error in errors:
