@@ -49,6 +49,8 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
         self.assertEqual(preview["total_orders"], 3)
         self.assertEqual(preview["valid_orders"], 1)
         self.assertEqual(preview["invalid_orders"], 2)
+        self.assertEqual(preview["suggestion_count"], 1)
+        self.assertEqual(preview["orders_with_suggestions"], 1)
         self.assertEqual(preview["orders_to_import"][0]["order_code"], "ORD010")
         self.assertEqual(
             preview["orders_to_skip"][0]["order"]["order_code"],
@@ -217,6 +219,8 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertEqual(preview["total_orders"], 0)
         self.assertFalse(preview["requires_confirmation"])
         self.assertIsNone(preview["average_quality_score"])
+        self.assertEqual(preview["suggestion_count"], 0)
+        self.assertEqual(preview["orders_with_suggestions"], 0)
         mock_validate.assert_called_once_with()
 
     @patch("services.get_all_orders", return_value=[])
@@ -248,6 +252,8 @@ class TestSafeCsvImportService(unittest.TestCase):
             preview["validation_results"][0]["suggestions"],
             ["Example suggestion"],
         )
+        self.assertEqual(preview["suggestion_count"], 1)
+        self.assertEqual(preview["orders_with_suggestions"], 1)
         self.assertEqual(preview["average_quality_score"], 100.0)
         self.assertEqual(preview["review_recommended_orders"], 0)
         mock_get_orders.assert_called_once_with()
