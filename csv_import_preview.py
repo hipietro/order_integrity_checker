@@ -6,12 +6,18 @@ def build_csv_import_preview(validation_results):
     error_counts = {}
     quality_scores = []
     review_recommended_orders = 0
+    suggestion_count = 0
+    orders_with_suggestions = 0
 
     for result in validation_results:
         order = result["order"]
         errors = list(result["errors"])
         suggestions = list(result.get("suggestions", []))
         quality = result.get("quality")
+
+        if suggestions:
+            suggestion_count += len(suggestions)
+            orders_with_suggestions += 1
 
         if quality is not None:
             quality_scores.append(quality["score"])
@@ -51,6 +57,8 @@ def build_csv_import_preview(validation_results):
         "orders_to_import": orders_to_import,
         "orders_to_skip": orders_to_skip,
         "error_summary": error_summary,
+        "suggestion_count": suggestion_count,
+        "orders_with_suggestions": orders_with_suggestions,
         "average_quality_score": average_quality_score,
         "review_recommended_orders": review_recommended_orders,
         "requires_confirmation": len(validation_results) > 0,
