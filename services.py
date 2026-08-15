@@ -52,6 +52,7 @@ def _score_csv_validation_results(validation_results):
         scored_results.append({
             "order": result["order"],
             "errors": list(result["errors"]),
+            "suggestions": list(result.get("suggestions", [])),
             "quality": quality,
         })
 
@@ -119,6 +120,7 @@ def import_csv_orders(preview, confirmed=False):
                 skipped_orders.append({
                     "order": order,
                     "errors": list(errors),
+                    "suggestions": list(result.get("suggestions", [])),
                 })
 
         invalid_report_count = generate_invalid_orders_report(
