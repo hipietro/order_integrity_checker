@@ -28,6 +28,9 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
                     "missing customer name",
                     "quantity must be greater than zero",
                 ],
+                "suggestions": [
+                    "Review quantity: it must be greater than zero",
+                ],
             },
             {
                 "order": {
@@ -50,6 +53,10 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
         self.assertEqual(
             preview["orders_to_skip"][0]["order"]["order_code"],
             "ORD011",
+        )
+        self.assertEqual(
+            preview["orders_to_skip"][0]["suggestions"],
+            ["Review quantity: it must be greater than zero"],
         )
         self.assertTrue(preview["requires_confirmation"])
 
@@ -76,6 +83,7 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
             {
                 "order": self.validation_results[1]["order"],
                 "errors": self.validation_results[1]["errors"],
+                "suggestions": self.validation_results[1]["suggestions"],
                 "quality": {
                     "score": 50,
                     "review_recommended": True,
@@ -109,6 +117,7 @@ class TestSafeCsvImportService(unittest.TestCase):
                     "status": "pending",
                 },
                 "errors": ["missing customer name"],
+                "suggestions": ["Provide a customer name"],
             },
         ])
 
@@ -126,6 +135,10 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertTrue(result["cancelled"])
         self.assertFalse(result["csv_cleared"])
+        self.assertEqual(
+            result["skipped_orders"][0]["suggestions"],
+            ["Provide a customer name"],
+        )
         mock_insert.assert_not_called()
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
@@ -145,6 +158,10 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertFalse(result["cancelled"])
         self.assertEqual(len(result["saved_orders"]), 1)
         self.assertEqual(len(result["skipped_orders"]), 1)
+        self.assertEqual(
+            result["skipped_orders"][0]["suggestions"],
+            ["Provide a customer name"],
+        )
         self.assertTrue(result["csv_cleared"])
         mock_insert.assert_called_once_with(self.preview["orders_to_import"][0])
         mock_report.assert_called_once_with(self.preview["validation_results"])
@@ -163,6 +180,10 @@ class TestSafeCsvImportService(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertTrue(result["csv_cleared"])
+        self.assertEqual(
+            result["skipped_orders"][0]["suggestions"],
+            ["Provide a customer name"],
+        )
         mock_insert.assert_called_once()
         mock_report.assert_called_once()
         mock_clear.assert_called_once()
@@ -214,6 +235,7 @@ class TestSafeCsvImportService(unittest.TestCase):
                     "status": "pending",
                 },
                 "errors": [],
+                "suggestions": ["Example suggestion"],
             }
         ]
 
@@ -222,6 +244,10 @@ class TestSafeCsvImportService(unittest.TestCase):
         quality = preview["validation_results"][0]["quality"]
         self.assertEqual(quality["score"], 100)
         self.assertEqual(quality["rating"], "high")
+        self.assertEqual(
+            preview["validation_results"][0]["suggestions"],
+            ["Example suggestion"],
+        )
         self.assertEqual(preview["average_quality_score"], 100.0)
         self.assertEqual(preview["review_recommended_orders"], 0)
         mock_get_orders.assert_called_once_with()
