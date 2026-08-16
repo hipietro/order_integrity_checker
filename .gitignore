@@ -2,6 +2,7 @@ invalid_orders_report.txt
 __pycache__/
 exported_orders.csv
 orders.db
+backups/
 .DS_Store
 
 # Development quality tools
