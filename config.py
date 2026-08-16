@@ -2,6 +2,10 @@
 # SQLite stores the whole database inside a single local file.
 DATABASE_NAME = "orders.db"
 
+# Directory and filename prefix used for local database recovery points.
+BACKUP_DIRECTORY = "backups"
+BACKUP_FILE_PREFIX = "orders_backup"
+
 # Name of the CSV file that contains the new orders to validate.
 CSV_FILE_NAME = "new_orders.csv"
 
