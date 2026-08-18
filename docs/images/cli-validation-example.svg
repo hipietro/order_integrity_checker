@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
+  <title id="title">Order Integrity Checker CLI validation example</title>
+  <desc id="desc">Terminal-style example showing a CSV import preview, quality score, validation summary, and one invalid order.</desc>
+  <rect width="1120" height="620" rx="18" fill="#111827"/>
+  <rect x="0" y="0" width="1120" height="54" rx="18" fill="#1f2937"/>
+  <circle cx="28" cy="27" r="7" fill="#ef4444"/>
+  <circle cx="52" cy="27" r="7" fill="#f59e0b"/>
+  <circle cx="76" cy="27" r="7" fill="#22c55e"/>
+  <text x="104" y="34" font-family="monospace" font-size="17" fill="#d1d5db">python3 main.py — CSV import preview</text>
+  <g font-family="monospace" font-size="19" fill="#f3f4f6">
+    <text x="34" y="92">CSV IMPORT PREVIEW</text>
+    <text x="34" y="120">------------------</text>
+    <text x="34" y="150">Total CSV orders: 6</text>
+    <text x="34" y="178">Orders to import: 3</text>
+    <text x="34" y="206">Orders to skip: 3</text>
+
+    <text x="34" y="252">ORDER QUALITY</text>
+    <text x="34" y="280">-------------</text>
+    <text x="34" y="308">Average quality score: 78.3/100</text>
+    <text x="34" y="336">Orders recommended for review: 2</text>
+
+    <text x="34" y="382">VALIDATION REASON SUMMARY</text>
+    <text x="34" y="410">-------------------------</text>
+    <text x="34" y="438">- missing customer name: 1</text>
+    <text x="34" y="466">- quantity must be greater than zero: 1</text>
+    <text x="34" y="494">- invalid status: 1</text>
+
+    <text x="600" y="92">INVALID CSV ORDERS</text>
+    <text x="600" y="120">------------------</text>
+    <text x="600" y="158">Order code: ORD006</text>
+    <text x="600" y="186">Customer name: Sara Neri</text>
+    <text x="600" y="214">Quantity: 7</text>
+    <text x="600" y="242">Status: unknown</text>
+    <text x="600" y="280">Reasons for skipping:</text>
+    <text x="600" y="308">- invalid status</text>
+  </g>
+  <text x="34" y="582" font-family="monospace" font-size="15" fill="#9ca3af">Example output mirrors the CLI preview and validation presentation implemented in menu.py.</text>
+</svg>
