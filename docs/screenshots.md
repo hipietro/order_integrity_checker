@@ -26,7 +26,7 @@ python3 -m pip install -r requirements-dev.txt
 python3 capture_gui_screenshot.py
 ```
 
-The command launches the real `OrderIntegrityCheckerGUI`, waits for Tkinter to render the main window, captures the window bounds with Pillow, saves `docs/images/gui-main-window.png`, and exits automatically.
+The command launches the real `OrderIntegrityCheckerGUI`, waits for Tkinter to render the main window, captures the window bounds with Pillow, validates that the result is a readable PNG of suitable README dimensions, saves `docs/images/gui-main-window.png`, and exits automatically.
 
 An alternative output path can be used for review without overwriting the canonical README asset:
 
@@ -34,7 +34,13 @@ An alternative output path can be used for review without overwriting the canoni
 python3 capture_gui_screenshot.py --output /tmp/order-integrity-gui.png
 ```
 
-The capture must run in an interactive desktop session. Headless CI is intentionally not treated as the source of truth for the portfolio screenshot because window-manager rendering differs across platforms.
+## CI screenshot smoke test
+
+GitHub Actions also launches the real Tkinter application inside an Xvfb virtual display. The `gui-screenshot-smoke-test` job captures and validates the window, then uploads the result as the `gui-main-window` workflow artifact.
+
+This headless capture is not a mockup: it exercises the same `OrderIntegrityCheckerGUI` and the same Pillow capture code used by the desktop command. Its purpose is to catch broken rendering or capture logic on every push and pull request.
+
+The CI artifact is a reproducible verification image rather than an automatically committed documentation asset. Before replacing the canonical README screenshot, review the resulting image visually so layout regressions are not published simply because the PNG passed structural validation.
 
 Before committing the canonical image:
 
@@ -43,7 +49,8 @@ Before committing the canonical image:
 3. use only sample order data;
 4. verify the image is readable at GitHub README width;
 5. confirm the output is a real capture of the current application;
-6. embed it in the README with meaningful alternative text.
+6. confirm the automated PNG validation succeeds;
+7. embed it in the README with meaningful alternative text.
 
 ## Review checklist
 
@@ -54,6 +61,7 @@ Before committing a documentation image, verify that:
 - labels shown in the image still exist in the source code;
 - the image is stored under `docs/images/`;
 - Markdown uses a relative repository path;
-- the alternative text describes the useful content of the image.
+- the alternative text describes the useful content of the image;
+- CI can still produce and validate its own real GUI capture.
 
 This workflow keeps portfolio visuals reviewable and prevents screenshots from silently drifting away from the actual interface.
