@@ -23,8 +23,12 @@ Install the development dependencies, then run the dedicated capture command fro
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
+python3 gui.py
 python3 capture_gui_screenshot.py
 ```
+
+Close the manually launched GUI after confirming that the real application renders
+correctly, then use the capture command to create and validate the documentation PNG.
 
 The command launches the real `OrderIntegrityCheckerGUI`, waits for Tkinter to render the main window, captures the window bounds with Pillow, validates that the result is a readable PNG of suitable README dimensions, saves `docs/images/gui-main-window.png`, and exits automatically.
 
