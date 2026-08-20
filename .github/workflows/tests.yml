@@ -30,3 +30,33 @@ jobs:
 
       - name: Enforce core coverage threshold
         run: python -m coverage report
+
+  gui-screenshot-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install Tkinter and virtual display tools
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+
+      - name: Install development dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Capture real GUI in virtual display
+        run: xvfb-run -a python capture_gui_screenshot.py --output /tmp/gui-main-window.png --delay-ms 1200
+
+      - name: Upload GUI screenshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-main-window
+          path: /tmp/gui-main-window.png
+          if-no-files-found: error
