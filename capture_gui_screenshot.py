@@ -4,11 +4,12 @@ import tkinter as tk
 from database import create_database, insert_sample_orders
 from gui import OrderIntegrityCheckerGUI
 from screenshot_capture import DEFAULT_SCREENSHOT_PATH, capture_window
+from screenshot_validation import validate_gui_screenshot
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Capture a real screenshot of the Tkinter main window."
+        description="Capture and validate a real screenshot of the Tkinter main window."
     )
     parser.add_argument(
         "--output",
@@ -34,9 +35,15 @@ def main():
     OrderIntegrityCheckerGUI(root)
 
     def capture_and_close():
-        path = capture_window(root, args.output)
-        print(f"GUI screenshot saved to {path}")
-        root.destroy()
+        try:
+            path = capture_window(root, args.output)
+            result = validate_gui_screenshot(path)
+            print(
+                "GUI screenshot saved and validated: "
+                f"{result['path']} ({result['width']}x{result['height']})"
+            )
+        finally:
+            root.destroy()
 
     root.after(max(args.delay_ms, 0), capture_and_close)
     root.mainloop()
