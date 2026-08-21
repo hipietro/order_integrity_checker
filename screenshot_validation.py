@@ -1,3 +1,4 @@
+from hashlib import sha256
 from pathlib import Path
 
 MIN_SCREENSHOT_WIDTH = 800
@@ -42,4 +43,5 @@ def validate_gui_screenshot(
         "width": width,
         "height": height,
         "format": image_format,
+        "sha256": sha256(path.read_bytes()).hexdigest(),
     }
