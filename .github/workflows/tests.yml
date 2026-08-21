@@ -52,11 +52,17 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
 
       - name: Capture real GUI in virtual display
-        run: xvfb-run -a python capture_gui_screenshot.py --output /tmp/gui-main-window.png --delay-ms 1200
+        run: >-
+          xvfb-run -a python capture_gui_screenshot.py
+          --output /tmp/gui-main-window.png
+          --manifest /tmp/gui-main-window.json
+          --delay-ms 1200
 
-      - name: Upload GUI screenshot artifact
+      - name: Upload GUI screenshot and provenance artifact
         uses: actions/upload-artifact@v4
         with:
           name: gui-main-window
-          path: /tmp/gui-main-window.png
+          path: |
+            /tmp/gui-main-window.png
+            /tmp/gui-main-window.json
           if-no-files-found: error
