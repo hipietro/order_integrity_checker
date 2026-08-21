@@ -27,15 +27,24 @@ python3 gui.py
 python3 capture_gui_screenshot.py
 ```
 
-Close the manually launched GUI after confirming that the real application renders
-correctly, then use the capture command to create and validate the documentation PNG.
+Close the manually launched GUI after confirming that the real application renders correctly, then use the capture command to create and validate the documentation PNG.
 
-The command launches the real `OrderIntegrityCheckerGUI`, waits for Tkinter to render the main window, captures the window bounds with Pillow, validates that the result is a readable PNG of suitable README dimensions, saves `docs/images/gui-main-window.png`, and exits automatically.
+The command launches the real `OrderIntegrityCheckerGUI`, waits for Tkinter to render the main window, captures the window bounds with Pillow, validates that the result is a readable PNG of suitable README dimensions, saves `docs/images/gui-main-window.png`, writes a matching JSON provenance manifest, and exits automatically.
+
+The validation result includes a SHA-256 digest of the image. The manifest records the asset path, format, dimensions, digest, UTC generation time, and the `GITHUB_SHA` source commit when capture runs in GitHub Actions. This makes a reviewed screenshot traceable to the exact bytes and source revision that produced it.
 
 An alternative output path can be used for review without overwriting the canonical README asset:
 
 ```bash
 python3 capture_gui_screenshot.py --output /tmp/order-integrity-gui.png
+```
+
+A custom manifest path can also be supplied:
+
+```bash
+python3 capture_gui_screenshot.py \
+  --output /tmp/order-integrity-gui.png \
+  --manifest /tmp/order-integrity-gui.json
 ```
 
 ## CI screenshot smoke test
@@ -44,7 +53,7 @@ GitHub Actions also launches the real Tkinter application inside an Xvfb virtual
 
 This headless capture is not a mockup: it exercises the same `OrderIntegrityCheckerGUI` and the same Pillow capture code used by the desktop command. Its purpose is to catch broken rendering or capture logic on every push and pull request.
 
-The CI artifact is a reproducible verification image rather than an automatically committed documentation asset. Before replacing the canonical README screenshot, review the resulting image visually so layout regressions are not published simply because the PNG passed structural validation.
+The CI artifact is a reproducible verification image rather than an automatically committed documentation asset. Before replacing the canonical README screenshot, review the resulting image visually so layout regressions are not published simply because the PNG passed structural validation. The image digest and manifest should be retained during review so the approved bytes can be compared with the version eventually committed.
 
 Before committing the canonical image:
 
@@ -54,7 +63,8 @@ Before committing the canonical image:
 4. verify the image is readable at GitHub README width;
 5. confirm the output is a real capture of the current application;
 6. confirm the automated PNG validation succeeds;
-7. embed it in the README with meaningful alternative text.
+7. verify the SHA-256 digest matches the reviewed capture;
+8. embed it in the README with meaningful alternative text.
 
 ## Review checklist
 
@@ -66,6 +76,7 @@ Before committing a documentation image, verify that:
 - the image is stored under `docs/images/`;
 - Markdown uses a relative repository path;
 - the alternative text describes the useful content of the image;
+- the provenance manifest identifies the reviewed image bytes and source commit when available;
 - CI can still produce and validate its own real GUI capture.
 
 This workflow keeps portfolio visuals reviewable and prevents screenshots from silently drifting away from the actual interface.
