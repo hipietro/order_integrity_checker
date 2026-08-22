@@ -58,6 +58,12 @@ jobs:
           --manifest /tmp/gui-main-window.json
           --delay-ms 1200
 
+      - name: Verify screenshot provenance pair
+        run: >-
+          python verify_gui_screenshot.py
+          /tmp/gui-main-window.png
+          /tmp/gui-main-window.json
+
       - name: Upload GUI screenshot and provenance artifact
         uses: actions/upload-artifact@v4
         with:
