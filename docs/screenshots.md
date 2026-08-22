@@ -47,9 +47,21 @@ python3 capture_gui_screenshot.py \
   --manifest /tmp/order-integrity-gui.json
 ```
 
+## Verify an approved capture
+
+Before committing a reviewed screenshot, verify that the PNG still matches the exact provenance manifest produced with it:
+
+```bash
+python3 verify_gui_screenshot.py \
+  /tmp/order-integrity-gui.png \
+  /tmp/order-integrity-gui.json
+```
+
+The verifier validates the PNG again and rejects the pair if its format, dimensions, or SHA-256 digest no longer matches the manifest. This protects the review step from accidentally approving one image and committing different bytes later.
+
 ## CI screenshot smoke test
 
-GitHub Actions also launches the real Tkinter application inside an Xvfb virtual display. The `gui-screenshot-smoke-test` job captures and validates the window, then uploads the result as the `gui-main-window` workflow artifact.
+GitHub Actions also launches the real Tkinter application inside an Xvfb virtual display. The `gui-screenshot-smoke-test` job captures and validates the window, verifies the generated PNG against its provenance manifest, then uploads both files as the `gui-main-window` workflow artifact.
 
 This headless capture is not a mockup: it exercises the same `OrderIntegrityCheckerGUI` and the same Pillow capture code used by the desktop command. Its purpose is to catch broken rendering or capture logic on every push and pull request.
 
@@ -63,8 +75,9 @@ Before committing the canonical image:
 4. verify the image is readable at GitHub README width;
 5. confirm the output is a real capture of the current application;
 6. confirm the automated PNG validation succeeds;
-7. verify the SHA-256 digest matches the reviewed capture;
-8. embed it in the README with meaningful alternative text.
+7. run `verify_gui_screenshot.py` against the reviewed PNG and manifest;
+8. verify the SHA-256 digest matches the reviewed capture;
+9. embed it in the README with meaningful alternative text.
 
 ## Review checklist
 
@@ -77,6 +90,7 @@ Before committing a documentation image, verify that:
 - Markdown uses a relative repository path;
 - the alternative text describes the useful content of the image;
 - the provenance manifest identifies the reviewed image bytes and source commit when available;
+- the committed PNG matches the reviewed manifest exactly;
 - CI can still produce and validate its own real GUI capture.
 
 This workflow keeps portfolio visuals reviewable and prevents screenshots from silently drifting away from the actual interface.
