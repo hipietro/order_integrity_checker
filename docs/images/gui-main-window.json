@@ -1,0 +1,11 @@
+{
+  "asset": "docs/images/gui-main-window.png",
+  "canonical": true,
+  "format": "PNG",
+  "generated_at": "2026-08-23T13:31:19.638810+00:00",
+  "height": 760,
+  "review_status": "approved",
+  "sha256": "fc683bfd62c597fc10d7ad87acc67fbda8f35fb2d247256357736ffb3b54cecb",
+  "source_commit": "eb3c0a8fb1968a8717a919c3d30cf35824b1fa9c",
+  "width": 1100
+}
