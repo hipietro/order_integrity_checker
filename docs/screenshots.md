@@ -59,6 +59,18 @@ python3 verify_gui_screenshot.py \
 
 The verifier validates the PNG again and rejects the pair if its format, dimensions, or SHA-256 digest no longer matches the manifest. This protects the review step from accidentally approving one image and committing different bytes later.
 
+## Publish an approved capture
+
+After visual approval, promote the verified pair to the canonical documentation paths with:
+
+```bash
+python3 publish_gui_screenshot.py \
+  /tmp/order-integrity-gui.png \
+  /tmp/order-integrity-gui.json
+```
+
+The release command verifies provenance before copying anything, writes the PNG to `docs/images/gui-main-window.png`, writes the matching manifest to `docs/images/gui-main-window.json`, and marks the released manifest as canonical and approved. This keeps verification, release, and presentation concerns separated instead of duplicating validation logic in CI or documentation scripts.
+
 ## CI screenshot smoke test
 
 GitHub Actions also launches the real Tkinter application inside an Xvfb virtual display. The `gui-screenshot-smoke-test` job captures and validates the window, verifies the generated PNG against its provenance manifest, then uploads both files as the `gui-main-window` workflow artifact.
@@ -77,7 +89,8 @@ Before committing the canonical image:
 6. confirm the automated PNG validation succeeds;
 7. run `verify_gui_screenshot.py` against the reviewed PNG and manifest;
 8. verify the SHA-256 digest matches the reviewed capture;
-9. embed it in the README with meaningful alternative text.
+9. run `publish_gui_screenshot.py` to promote the verified pair;
+10. embed it in the README with meaningful alternative text.
 
 ## Review checklist
 
