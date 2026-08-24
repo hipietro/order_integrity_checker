@@ -1,6 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 
-from api_schemas import OrderCreateRequest, OrderStatusUpdateRequest
+from api_schemas import (
+    OrderCreateRequest,
+    OrderStatusUpdateRequest,
+    ReadinessResponse,
+)
+from diagnostics import check_database_readiness
 from services import (
     create_order,
     delete_order,
@@ -22,6 +28,19 @@ app = FastAPI(
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/ready", response_model=ReadinessResponse)
+def readiness_check():
+    result = check_database_readiness()
+
+    if not result["ready"]:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=result,
+        )
+
+    return result
 
 
 @app.get("/orders")
