@@ -15,6 +15,42 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
+    @patch("api.check_database_readiness")
+    def test_ready_endpoint_returns_database_diagnostics(
+        self,
+        check_database_readiness,
+    ):
+        check_database_readiness.return_value = {
+            "ready": True,
+            "database": "orders.db",
+            "reason": "database is ready",
+            "missing_tables": [],
+        }
+
+        response = self.client.get("/ready")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ready"])
+        self.assertEqual(response.json()["database"], "orders.db")
+
+    @patch("api.check_database_readiness")
+    def test_ready_endpoint_returns_503_when_database_is_not_ready(
+        self,
+        check_database_readiness,
+    ):
+        check_database_readiness.return_value = {
+            "ready": False,
+            "database": "orders.db",
+            "reason": "database schema is incomplete",
+            "missing_tables": ["customers"],
+        }
+
+        response = self.client.get("/ready")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["ready"])
+        self.assertEqual(response.json()["missing_tables"], ["customers"])
+
     @patch("api.get_database_orders")
     def test_list_orders_uses_service_layer(self, get_database_orders):
         get_database_orders.return_value = [{"order_code": "ORD001"}]
