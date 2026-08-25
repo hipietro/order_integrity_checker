@@ -57,9 +57,11 @@ The migration runs inside one SQLite transaction. If it fails, the transaction i
 
 ## Order creation and CSV import
 
-Both manual creation and confirmed CSV imports call `insert_order_into_database()`.
+Manual creation calls `insert_order_into_database()`. Confirmed CSV imports
+call `insert_orders_into_database()` so every valid row is committed as one
+atomic batch.
 
-That database function:
+Both database paths reuse the same cursor-level insertion logic, which:
 
 1. Normalizes the order and customer name.
 2. Finds an existing customer with the same normalized key.
@@ -67,6 +69,8 @@ That database function:
 4. Inserts the order using the resulting `customer_id`.
 
 This means every order-entry path follows the same duplicate-prevention rule.
+It also means a failed CSV row rolls back customers created for earlier rows in
+the same import instead of leaving orphaned or partially imported data.
 
 ## Customer services
 

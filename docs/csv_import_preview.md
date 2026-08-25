@@ -37,13 +37,26 @@ The existing GUI validation-list call remains supported because the GUI invokes 
 
 ## Failure behavior
 
+All valid rows in one confirmed preview are inserted through a single SQLite
+transaction. The transaction also includes any normalized customer records
+created for those rows.
+
 The CSV file is cleared only after:
 
-1. every valid order has been processed;
+1. every valid order has been committed together;
 2. invalid orders have been collected;
 3. the invalid-order report has been generated.
 
-If an exception occurs before completion, the service returns an unsuccessful result and preserves the CSV file for investigation or retry.
+If any order fails, the complete transaction is rolled back. Earlier orders
+and customers from the same batch are not left behind:
+
+- the result contains `saved_orders=[]`;
+- the failure message identifies the order that stopped the batch;
+- the invalid-order report is not generated;
+- the CSV input is preserved for investigation or retry.
+
+Manual single-order creation keeps its independent transaction because it is
+not part of the confirmed CSV batch.
 
 ## CLI behavior
 

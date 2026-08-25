@@ -17,6 +17,7 @@ The project focuses on software-engineering practices that transfer to productio
 - suspicious duplicate detection
 - suggested fixes for invalid records
 - transactional status history
+- atomic, all-or-nothing confirmed CSV imports
 - safe database backup and restore
 - CLI, Tkinter GUI, and REST interfaces over shared business logic
 - automated tests, linting, coverage enforcement, and GitHub Actions CI
@@ -47,7 +48,8 @@ The reproducible capture, verification, and release process for visual assets is
 - Calculate explainable quality scores and flag records that deserve review.
 - Generate suggested fixes for malformed codes, misspelled statuses, whitespace problems, and unusual quantities.
 - Preview CSV imports before any persistent change is made.
-- Import valid rows only after explicit confirmation and report skipped rows with reasons.
+- Import valid rows in one transaction after explicit confirmation and report
+  skipped rows with reasons.
 
 ### Persistence and recovery
 
