@@ -217,6 +217,34 @@ class TestSafeCsvImportService(unittest.TestCase):
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
 
+    @patch(
+        "services.clear_csv_orders",
+        side_effect=RuntimeError("CSV file unavailable"),
+    )
+    @patch("services.generate_invalid_orders_report", return_value=1)
+    @patch("services.insert_orders_into_database")
+    def test_cleanup_failure_reports_orders_already_committed(
+        self,
+        mock_insert,
+        mock_report,
+        mock_clear,
+    ):
+        mock_insert.return_value = self.preview["orders_to_import"]
+
+        result = services.import_csv_orders(self.preview, confirmed=True)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(
+            result["saved_orders"],
+            self.preview["orders_to_import"],
+        )
+        self.assertEqual(result["invalid_report_count"], 1)
+        self.assertFalse(result["csv_cleared"])
+        self.assertIn("CSV file unavailable", result["message"])
+        mock_insert.assert_called_once_with(self.preview["orders_to_import"])
+        mock_report.assert_called_once_with(self.preview["validation_results"])
+        mock_clear.assert_called_once_with()
+
     @patch("services.validate_all_csv_orders", return_value=[])
     def test_empty_preview_does_not_require_confirmation(self, mock_validate):
         preview = services.preview_csv_import()

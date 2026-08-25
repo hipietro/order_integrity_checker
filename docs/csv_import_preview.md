@@ -58,6 +58,11 @@ and customers from the same batch are not left behind:
 Manual single-order creation keeps its independent transaction because it is
 not part of the confirmed CSV batch.
 
+If the database commit succeeds but a later report or CSV cleanup operation
+fails, the unsuccessful result still lists the orders that were committed and
+the CSV remains available. This distinguishes a rolled-back batch from a
+post-commit file-handling problem.
+
 ## CLI behavior
 
 The main CLI shows the following before asking for confirmation:

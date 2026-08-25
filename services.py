@@ -108,6 +108,7 @@ def import_csv_orders(preview, confirmed=False):
 
     saved_orders = []
     skipped_orders = []
+    invalid_report_count = 0
 
     try:
         orders_to_insert = []
@@ -136,9 +137,9 @@ def import_csv_orders(preview, confirmed=False):
         return {
             "success": False,
             "cancelled": False,
-            "saved_orders": [],
+            "saved_orders": saved_orders,
             "skipped_orders": skipped_orders,
-            "invalid_report_count": 0,
+            "invalid_report_count": invalid_report_count,
             "csv_cleared": False,
             "message": f"CSV import failed: {error}",
         }
