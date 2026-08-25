@@ -59,14 +59,18 @@ class TestAtomicBatchImportRepository(unittest.TestCase):
             database_name=str(self.database_path),
         )
 
-        self.assertEqual([order["order_code"] for order in saved], ["ORD100", "ORD101"])
+        self.assertEqual(
+            [order["order_code"] for order in saved],
+            ["ORD100", "ORD101"],
+        )
 
         connection = sqlite3.connect(self.database_path)
         customers = connection.execute(
             "SELECT id, normalized_name FROM customers ORDER BY id"
         ).fetchall()
         stored_orders = connection.execute(
-            "SELECT order_code, customer_id, quantity, status FROM orders ORDER BY id"
+            "SELECT order_code, customer_id, quantity, status "
+            "FROM orders ORDER BY id"
         ).fetchall()
         connection.close()
 
@@ -79,6 +83,59 @@ class TestAtomicBatchImportRepository(unittest.TestCase):
                 ("ORD101", customers[0][0], 3, "completed"),
             ],
         )
+
+    def test_late_duplicate_rolls_back_orders_and_new_customers(self):
+        connection = sqlite3.connect(self.database_path)
+        connection.execute(
+            "INSERT INTO customers (name, normalized_name) VALUES (?, ?)",
+            ("Existing Customer", "existing customer"),
+        )
+        existing_customer_id = connection.execute(
+            "SELECT id FROM customers WHERE normalized_name = ?",
+            ("existing customer",),
+        ).fetchone()[0]
+        connection.execute(
+            """
+            INSERT INTO orders (order_code, customer_id, quantity, status)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("ORD999", existing_customer_id, 1, "pending"),
+        )
+        connection.commit()
+        connection.close()
+
+        orders = [
+            {
+                "order_code": "ORD200",
+                "customer_name": "Brand New Customer",
+                "quantity": "4",
+                "status": "pending",
+            },
+            {
+                "order_code": "ORD999",
+                "customer_name": "Another New Customer",
+                "quantity": "5",
+                "status": "completed",
+            },
+        ]
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            insert_orders_atomically(
+                orders,
+                database_name=str(self.database_path),
+            )
+
+        connection = sqlite3.connect(self.database_path)
+        stored_codes = connection.execute(
+            "SELECT order_code FROM orders ORDER BY id"
+        ).fetchall()
+        customers = connection.execute(
+            "SELECT normalized_name FROM customers ORDER BY id"
+        ).fetchall()
+        connection.close()
+
+        self.assertEqual(stored_codes, [("ORD999",)])
+        self.assertEqual(customers, [("existing customer",)])
 
 
 if __name__ == "__main__":
