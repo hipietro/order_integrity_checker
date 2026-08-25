@@ -9,6 +9,7 @@ from database import (
     get_order_statistics,
     get_status_history_for_order,
     insert_order_into_database,
+    insert_orders_into_database,
     search_customers_by_name,
     update_order_status_in_database,
 )
@@ -109,19 +110,23 @@ def import_csv_orders(preview, confirmed=False):
     skipped_orders = []
 
     try:
+        orders_to_insert = []
+
         for result in validation_results:
             order = result["order"]
             errors = result["errors"]
 
             if len(errors) == 0:
-                insert_order_into_database(order)
-                saved_orders.append(order)
+                orders_to_insert.append(order)
             else:
                 skipped_orders.append({
                     "order": order,
                     "errors": list(errors),
                     "suggestions": list(result.get("suggestions", [])),
                 })
+
+        if orders_to_insert:
+            saved_orders = insert_orders_into_database(orders_to_insert)
 
         invalid_report_count = generate_invalid_orders_report(
             validation_results
@@ -131,7 +136,7 @@ def import_csv_orders(preview, confirmed=False):
         return {
             "success": False,
             "cancelled": False,
-            "saved_orders": saved_orders,
+            "saved_orders": [],
             "skipped_orders": skipped_orders,
             "invalid_report_count": 0,
             "csv_cleared": False,
