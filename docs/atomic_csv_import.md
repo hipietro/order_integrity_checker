@@ -1,6 +1,6 @@
 # Atomic CSV import persistence
 
-Confirmed CSV imports need an all-or-nothing persistence boundary. Saving rows one at a time can leave earlier orders committed when a later row fails, which makes retries unsafe and gives operators a misleading picture of what was imported.
+Confirmed CSV imports use an all-or-nothing persistence boundary. Saving rows one at a time can leave earlier orders committed when a later row fails, which makes retries unsafe and gives operators a misleading picture of what was imported.
 
 ## Transactional repository
 
@@ -27,21 +27,25 @@ This separation keeps three responsibilities distinct:
 2. orchestration selects the valid orders for the confirmed operation;
 3. the repository owns the SQLite transaction.
 
-## Current integration status
+## Service integration
 
-The atomic repository and orchestration boundary are implemented and covered by focused tests. The existing `services.import_csv_orders()` entry point still uses the older per-order insert loop, so issue #31 remains open until that entry point is switched to `persist_validated_orders()` and its existing service tests are updated.
+`services.import_csv_orders()` now uses `persist_validated_orders()` for every confirmed preview instead of inserting valid rows individually.
 
-When that integration is completed, the service must also keep these external behaviors:
+The lifecycle is intentionally ordered as follows:
 
-- return `saved_orders=[]` after any batch failure;
-- preserve the CSV file after failure;
-- generate the invalid-order report only after the database batch commits;
-- clear the CSV only after the committed batch and report generation succeed;
-- keep manual single-order creation unchanged.
+1. collect invalid rows for the skipped-order response;
+2. persist all valid rows in one atomic SQLite batch;
+3. generate the invalid-order report only after the batch commits;
+4. clear the CSV only after persistence and report generation succeed;
+5. return the committed orders in `saved_orders`.
 
-## Test coverage added
+If batch persistence raises an exception, the service returns `success=False`, reports `saved_orders=[]`, leaves `csv_cleared=False`, and does not generate a report or clear the CSV. This matches the database rollback contract and avoids claiming that partially inserted rows were saved.
 
-Focused tests cover:
+Manual single-order creation remains independent: `services.create_order()` still validates one order and calls `database.insert_order_into_database()` directly.
+
+## Test coverage
+
+Automated coverage includes:
 
 - successful multi-order insertion;
 - normalized customer reuse in one batch;
@@ -49,4 +53,8 @@ Focused tests cover:
 - rollback of customers created earlier in a failed batch;
 - filtering invalid validation results before persistence;
 - avoiding a database call when there are no valid orders;
-- propagation of batch failures to the caller.
+- propagation of batch failures to the caller;
+- confirmed service imports delegating to the atomic batch boundary;
+- report generation and CSV clearing after successful persistence;
+- `saved_orders=[]`, no report, and no CSV clearing after batch failure;
+- a service-level SQLite integration test that forces a late UNIQUE conflict and verifies both the earlier order and newly created customers are rolled back.
