@@ -43,9 +43,14 @@ created for those rows.
 
 The CSV file is cleared only after:
 
-1. every valid order has been committed together;
-2. invalid orders have been collected;
-3. the invalid-order report has been generated.
+1. invalid orders have been collected;
+2. every valid order has been committed together;
+3. the invalid-order report has been generated;
+4. a complete header-only replacement CSV has been written and synchronized.
+
+The final cleanup uses an atomic file replacement in the same directory. An
+error while writing or replacing the temporary file leaves the original CSV
+untouched instead of truncating it in place.
 
 If any order fails, the complete transaction is rolled back. Earlier orders
 and customers from the same batch are not left behind:
@@ -62,11 +67,12 @@ fails, the unsuccessful result still lists the orders that were committed and
 the CSV remains available. This distinguishes a rolled-back batch from a
 post-commit file-handling problem.
 
-The GUI presents these outcomes differently. A rolled-back or otherwise
+The GUI and CLI present these outcomes differently. A rolled-back or otherwise
 unsaved batch reports that no orders were saved and that the CSV is available
-for inspection. A post-commit failure reports how many orders are already in
-the database and warns the operator to check them before retrying. Neither path
-claims that the CSV was cleared or that the import completed successfully.
+for inspection. A post-commit failure reports the codes already committed and
+warns the operator to check the database before retrying. Skipped-row reasons
+are shown directly if the invalid-order report was not generated. No failure
+path claims that the CSV was cleared or that the import completed successfully.
 
 ## CLI behavior
 

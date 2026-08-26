@@ -26,6 +26,9 @@ show_missing = true
 skip_covered = true
 precision = 1
 include = [
+    "atomic_import_service.py",
+    "batch_import_repository.py",
+    "csv_manager.py",
     "database.py",
     "services.py",
     "validator.py",

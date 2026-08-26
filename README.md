@@ -119,6 +119,7 @@ order_integrity_checker/
 ├── batch_import_repository.py
 ├── capture_gui_screenshot.py
 ├── config.py
+├── csv_import_feedback.py
 ├── csv_import_preview.py
 ├── csv_manager.py
 ├── customer_browser_cli.py
@@ -126,7 +127,6 @@ order_integrity_checker/
 ├── database.py
 ├── duplicate_detector.py
 ├── gui.py
-├── gui_import_feedback.py
 ├── main.py
 ├── menu.py
 ├── normalizer.py

@@ -32,20 +32,25 @@ This separation keeps three responsibilities distinct:
 `services.import_csv_orders()` passes the complete validation result set to
 `persist_validated_orders()`. The orchestrator filters valid rows and calls the
 batch repository exactly once. After that call succeeds, the service generates
-the invalid-order report and clears the input CSV.
+the invalid-order report and clears the input CSV through an atomic file
+replacement.
 
 The ordering is intentional:
 
 1. collect invalid rows for the result;
 2. persist every valid row in one atomic database batch;
 3. generate the invalid-order report;
-4. clear the input CSV.
+4. write an empty, header-only CSV to a temporary file in the input directory;
+5. atomically replace the input CSV with that completed temporary file.
 
 If the database batch fails, the service returns `saved_orders=[]`, does not
-generate the report, and preserves the CSV. If report generation or CSV
-cleanup fails after the commit, the result retains the committed orders and
-marks the operation unsuccessful. The GUI then warns the operator to inspect
-the database before retrying instead of claiming that the import succeeded.
+generate the report, and preserves the CSV. If report generation, temporary
+CSV creation, or replacement fails after the commit, the original CSV is left
+untouched, the result retains the committed orders, and the operation is marked
+unsuccessful. The GUI and CLI then warn the operator to inspect the database
+before retrying instead of claiming that the import succeeded. The atomic
+replacement also prevents a partial header write from truncating the original
+input.
 
 Manual creation still calls `database.insert_order_into_database()` and keeps
 its original independent transaction and `None` return contract.
@@ -63,4 +68,6 @@ Focused tests cover:
 - propagation of batch failures to the caller;
 - the complete service-to-repository rollback path for a stale preview;
 - preservation of committed-order details after a post-commit failure;
-- accurate GUI feedback for rollback and post-commit failure results.
+- preservation of the original CSV when temporary writing or replacement
+  fails;
+- accurate GUI and CLI feedback for rollback and post-commit failure results.
