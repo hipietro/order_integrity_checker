@@ -10,16 +10,6 @@ from normalizer import (
 )
 
 
-class BatchOrderInsertError(Exception):
-    """Reports which order caused an atomic batch insert to roll back."""
-
-    def __init__(self, order_code):
-        self.order_code = order_code or "<unknown>"
-        super().__init__(
-            f"Could not import order {self.order_code}. No orders were saved."
-        )
-
-
 def _connect():
     """Creates a SQLite connection with foreign-key checks enabled."""
 
@@ -401,74 +391,39 @@ def order_exists_in_database(order_code):
     return get_order_by_code(order_code) is not None
 
 
-def _insert_order_with_cursor(cursor, order):
-    """Inserts one normalized order through an existing transaction cursor."""
-
-    normalized_order = normalize_order(order)
-    customer_id = _get_or_create_customer_with_cursor(
-        cursor,
-        normalized_order["customer_name"],
-    )
-
-    cursor.execute("""
-        INSERT INTO orders (
-            order_code,
-            customer_id,
-            quantity,
-            status
-        )
-        VALUES (?, ?, ?, ?)
-    """, (
-        normalized_order["order_code"],
-        customer_id,
-        int(normalized_order["quantity"]),
-        normalized_order["status"],
-    ))
-
-    return normalized_order
-
-
 def insert_order_into_database(order):
     """Inserts an order and links it to a normalized customer."""
 
+    normalized_order = normalize_order(order)
+
     connection = _connect()
     cursor = connection.cursor()
 
     try:
-        normalized_order = _insert_order_with_cursor(cursor, order)
+        customer_id = _get_or_create_customer_with_cursor(
+            cursor,
+            normalized_order["customer_name"],
+        )
+
+        cursor.execute("""
+            INSERT INTO orders (
+                order_code,
+                customer_id,
+                quantity,
+                status
+            )
+            VALUES (?, ?, ?, ?)
+        """, (
+            normalized_order["order_code"],
+            customer_id,
+            int(normalized_order["quantity"]),
+            normalized_order["status"],
+        ))
+
         connection.commit()
-        return normalized_order
     except sqlite3.Error:
         connection.rollback()
         raise
-    finally:
-        connection.close()
-
-
-def insert_orders_into_database(orders):
-    """Inserts every order in one transaction or rolls the whole batch back."""
-
-    connection = _connect()
-    cursor = connection.cursor()
-    inserted_orders = []
-    current_order_code = "<unknown>"
-
-    try:
-        for order in orders:
-            if isinstance(order, dict):
-                current_order_code = normalize_order_code(
-                    order.get("order_code", "")
-                )
-
-            inserted_orders.append(
-                _insert_order_with_cursor(cursor, order)
-            )
-
-        connection.commit()
-        return inserted_orders
-    except Exception as error:
-        connection.rollback()
-        raise BatchOrderInsertError(current_order_code) from error
     finally:
         connection.close()
 

@@ -1,3 +1,4 @@
+from atomic_import_service import persist_validated_orders
 from config import EXPORT_FILE_NAME
 from csv_import_preview import build_csv_import_preview
 from csv_manager import clear_csv_orders, export_orders_to_csv
@@ -9,7 +10,6 @@ from database import (
     get_order_statistics,
     get_status_history_for_order,
     insert_order_into_database,
-    insert_orders_into_database,
     search_customers_by_name,
     update_order_status_in_database,
 )
@@ -111,23 +111,18 @@ def import_csv_orders(preview, confirmed=False):
     invalid_report_count = 0
 
     try:
-        orders_to_insert = []
-
         for result in validation_results:
             order = result["order"]
             errors = result["errors"]
 
-            if len(errors) == 0:
-                orders_to_insert.append(order)
-            else:
+            if len(errors) != 0:
                 skipped_orders.append({
                     "order": order,
                     "errors": list(errors),
                     "suggestions": list(result.get("suggestions", [])),
                 })
 
-        if orders_to_insert:
-            saved_orders = insert_orders_into_database(orders_to_insert)
+        saved_orders = persist_validated_orders(validation_results)
 
         invalid_report_count = generate_invalid_orders_report(
             validation_results

@@ -125,7 +125,7 @@ class TestSafeCsvImportService(unittest.TestCase):
 
     @patch("services.clear_csv_orders")
     @patch("services.generate_invalid_orders_report")
-    @patch("services.insert_orders_into_database")
+    @patch("services.persist_validated_orders")
     def test_cancelled_import_does_not_modify_database_or_csv(
         self,
         mock_insert,
@@ -147,7 +147,7 @@ class TestSafeCsvImportService(unittest.TestCase):
 
     @patch("services.clear_csv_orders")
     @patch("services.generate_invalid_orders_report", return_value=1)
-    @patch("services.insert_orders_into_database")
+    @patch("services.persist_validated_orders")
     def test_confirmed_import_saves_valid_orders_and_clears_csv_last(
         self,
         mock_insert,
@@ -167,13 +167,13 @@ class TestSafeCsvImportService(unittest.TestCase):
             ["Provide a customer name"],
         )
         self.assertTrue(result["csv_cleared"])
-        mock_insert.assert_called_once_with(self.preview["orders_to_import"])
+        mock_insert.assert_called_once_with(self.preview["validation_results"])
         mock_report.assert_called_once_with(self.preview["validation_results"])
         mock_clear.assert_called_once_with()
 
     @patch("services.clear_csv_orders")
     @patch("services.generate_invalid_orders_report", return_value=1)
-    @patch("services.insert_orders_into_database")
+    @patch("services.persist_validated_orders")
     def test_confirmed_gui_validation_list_remains_supported(
         self,
         mock_insert,
@@ -197,7 +197,7 @@ class TestSafeCsvImportService(unittest.TestCase):
     @patch("services.clear_csv_orders")
     @patch("services.generate_invalid_orders_report")
     @patch(
-        "services.insert_orders_into_database",
+        "services.persist_validated_orders",
         side_effect=RuntimeError("database unavailable"),
     )
     def test_failed_import_keeps_csv_file(
@@ -213,7 +213,7 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertEqual(result["saved_orders"], [])
         self.assertFalse(result["csv_cleared"])
         self.assertIn("database unavailable", result["message"])
-        mock_insert.assert_called_once_with(self.preview["orders_to_import"])
+        mock_insert.assert_called_once_with(self.preview["validation_results"])
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
 
@@ -222,7 +222,7 @@ class TestSafeCsvImportService(unittest.TestCase):
         side_effect=RuntimeError("CSV file unavailable"),
     )
     @patch("services.generate_invalid_orders_report", return_value=1)
-    @patch("services.insert_orders_into_database")
+    @patch("services.persist_validated_orders")
     def test_cleanup_failure_reports_orders_already_committed(
         self,
         mock_insert,
@@ -241,7 +241,7 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertEqual(result["invalid_report_count"], 1)
         self.assertFalse(result["csv_cleared"])
         self.assertIn("CSV file unavailable", result["message"])
-        mock_insert.assert_called_once_with(self.preview["orders_to_import"])
+        mock_insert.assert_called_once_with(self.preview["validation_results"])
         mock_report.assert_called_once_with(self.preview["validation_results"])
         mock_clear.assert_called_once_with()
 
