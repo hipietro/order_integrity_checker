@@ -4,8 +4,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import atomic_import_service
 import database
 import services
+from batch_import_repository import insert_orders_atomically
 from csv_import_preview import build_csv_import_preview
 from normalizer import normalize_customer_key, normalize_customer_name
 
@@ -161,7 +163,19 @@ class TestCustomerServiceIntegration(CustomerDatabaseTestCase):
             },
             "errors": [],
         }])
-        imported = services.import_csv_orders(preview, confirmed=True)
+
+        def persist_to_isolated_database(orders):
+            return insert_orders_atomically(
+                orders,
+                database_name=self.database_path,
+            )
+
+        with patch.object(
+            atomic_import_service,
+            "insert_orders_atomically",
+            side_effect=persist_to_isolated_database,
+        ):
+            imported = services.import_csv_orders(preview, confirmed=True)
 
         customers = services.list_customers()
         matching_customers = services.search_customers("anna")
