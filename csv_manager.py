@@ -1,6 +1,20 @@
 import csv
+import os
+import tempfile
+from pathlib import Path
 
 from config import CSV_FILE_NAME, EXPORT_FILE_NAME
+
+
+CSV_HEADER = "order_code,customer_name,quantity,status\n"
+
+
+def _write_csv_header(file_handle):
+    """Writes and synchronizes the replacement CSV contents."""
+
+    file_handle.write(CSV_HEADER)
+    file_handle.flush()
+    os.fsync(file_handle.fileno())
 
 
 def read_orders_from_csv():
@@ -25,15 +39,35 @@ def read_orders_from_csv():
 
 def clear_csv_orders():
     """
-    Clears the CSV file while keeping the header row.
+    Atomically replaces the CSV contents with the header row.
 
     This allows the file to remain valid and ready for new orders.
+    If writing or replacing the temporary file fails, the original input is
+    left untouched.
     """
 
-    with open(CSV_FILE_NAME, "w") as file:
-        file.write("order_code,customer_name,quantity,status\n")
+    csv_path = Path(CSV_FILE_NAME)
+    temporary_path = None
 
-    print(f"{CSV_FILE_NAME} cleared successfully.")
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="",
+            dir=csv_path.parent,
+            prefix=f".{csv_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            _write_csv_header(temporary_file)
+
+        os.replace(temporary_path, csv_path)
+    except Exception:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise
+
 
 def export_orders_to_csv(orders):
     '''
