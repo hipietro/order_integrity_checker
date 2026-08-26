@@ -50,6 +50,8 @@ The reproducible capture, verification, and release process for visual assets is
 - Preview CSV imports before any persistent change is made.
 - Import valid rows in one transaction after explicit confirmation and report
   skipped rows with reasons.
+- Preserve the CSV after failure and distinguish a rolled-back batch from a
+  post-commit cleanup problem before an operator retries.
 
 ### Persistence and recovery
 
@@ -97,6 +99,7 @@ order_integrity_checker/
 │   │   ├── gui-main-window.json
 │   │   └── gui-main-window.png
 │   ├── screenshots.md
+│   ├── atomic_csv_import.md
 │   ├── csv_import_preview.md
 │   ├── customer_management.md
 │   ├── database_recovery.md
@@ -111,7 +114,9 @@ order_integrity_checker/
 ├── tests/
 ├── api.py
 ├── api_schemas.py
+├── atomic_import_service.py
 ├── backup_service.py
+├── batch_import_repository.py
 ├── capture_gui_screenshot.py
 ├── config.py
 ├── csv_import_preview.py
@@ -121,6 +126,7 @@ order_integrity_checker/
 ├── database.py
 ├── duplicate_detector.py
 ├── gui.py
+├── gui_import_feedback.py
 ├── main.py
 ├── menu.py
 ├── normalizer.py

@@ -51,7 +51,6 @@ If any order fails, the complete transaction is rolled back. Earlier orders
 and customers from the same batch are not left behind:
 
 - the result contains `saved_orders=[]`;
-- the failure message identifies the order that stopped the batch;
 - the invalid-order report is not generated;
 - the CSV input is preserved for investigation or retry.
 
@@ -62,6 +61,12 @@ If the database commit succeeds but a later report or CSV cleanup operation
 fails, the unsuccessful result still lists the orders that were committed and
 the CSV remains available. This distinguishes a rolled-back batch from a
 post-commit file-handling problem.
+
+The GUI presents these outcomes differently. A rolled-back or otherwise
+unsaved batch reports that no orders were saved and that the CSV is available
+for inspection. A post-commit failure reports how many orders are already in
+the database and warns the operator to check them before retrying. Neither path
+claims that the CSV was cleared or that the import completed successfully.
 
 ## CLI behavior
 

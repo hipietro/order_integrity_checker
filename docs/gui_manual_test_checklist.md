@@ -51,6 +51,11 @@ Use this checklist after changing `gui.py` to confirm that the main order-manage
 
 - Preview and import a CSV containing both valid and invalid orders.
 - Confirm that invalid orders are skipped and reported.
+- Confirm that a successful import says that the CSV was cleared.
+- Simulate a database failure before commit and confirm that the GUI reports
+  failure, zero saved orders, and an uncleared CSV instead of success.
+- Simulate a CSV cleanup failure after commit and confirm that the GUI reports
+  the saved count and warns you to inspect the database before retrying.
 - Display statistics and verify that the total matches the database contents.
 
 ## Regression check

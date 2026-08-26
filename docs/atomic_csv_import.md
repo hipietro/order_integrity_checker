@@ -27,17 +27,28 @@ This separation keeps three responsibilities distinct:
 2. orchestration selects the valid orders for the confirmed operation;
 3. the repository owns the SQLite transaction.
 
-## Current integration status
+## Integrated service workflow
 
-The atomic repository and orchestration boundary are implemented and covered by focused tests. The existing `services.import_csv_orders()` entry point still uses the older per-order insert loop, so issue #31 remains open until that entry point is switched to `persist_validated_orders()` and its existing service tests are updated.
+`services.import_csv_orders()` passes the complete validation result set to
+`persist_validated_orders()`. The orchestrator filters valid rows and calls the
+batch repository exactly once. After that call succeeds, the service generates
+the invalid-order report and clears the input CSV.
 
-When that integration is completed, the service must also keep these external behaviors:
+The ordering is intentional:
 
-- return `saved_orders=[]` after any batch failure;
-- preserve the CSV file after failure;
-- generate the invalid-order report only after the database batch commits;
-- clear the CSV only after the committed batch and report generation succeed;
-- keep manual single-order creation unchanged.
+1. collect invalid rows for the result;
+2. persist every valid row in one atomic database batch;
+3. generate the invalid-order report;
+4. clear the input CSV.
+
+If the database batch fails, the service returns `saved_orders=[]`, does not
+generate the report, and preserves the CSV. If report generation or CSV
+cleanup fails after the commit, the result retains the committed orders and
+marks the operation unsuccessful. The GUI then warns the operator to inspect
+the database before retrying instead of claiming that the import succeeded.
+
+Manual creation still calls `database.insert_order_into_database()` and keeps
+its original independent transaction and `None` return contract.
 
 ## Test coverage added
 
@@ -49,4 +60,7 @@ Focused tests cover:
 - rollback of customers created earlier in a failed batch;
 - filtering invalid validation results before persistence;
 - avoiding a database call when there are no valid orders;
-- propagation of batch failures to the caller.
+- propagation of batch failures to the caller;
+- the complete service-to-repository rollback path for a stale preview;
+- preservation of committed-order details after a post-commit failure;
+- accurate GUI feedback for rollback and post-commit failure results.
