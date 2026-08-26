@@ -2,8 +2,10 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from functools import partial
 from unittest.mock import patch
 
+import batch_import_repository
 import database
 import services
 from csv_import_preview import build_csv_import_preview
@@ -161,7 +163,16 @@ class TestCustomerServiceIntegration(CustomerDatabaseTestCase):
             },
             "errors": [],
         }])
-        imported = services.import_csv_orders(preview, confirmed=True)
+        batch_insert = partial(
+            batch_import_repository.insert_orders_atomically,
+            database_name=self.database_path,
+        )
+
+        with patch(
+            "atomic_import_service.insert_orders_atomically",
+            batch_insert,
+        ):
+            imported = services.import_csv_orders(preview, confirmed=True)
 
         customers = services.list_customers()
         matching_customers = services.search_customers("anna")
