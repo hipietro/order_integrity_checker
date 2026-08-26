@@ -1,3 +1,4 @@
+from atomic_import_service import persist_validated_orders
 from config import EXPORT_FILE_NAME
 from csv_import_preview import build_csv_import_preview
 from csv_manager import clear_csv_orders, export_orders_to_csv
@@ -71,7 +72,10 @@ def import_csv_orders(preview, confirmed=False):
     """
     Imports orders from a previously generated preview.
 
-    Valid orders are linked to normalized customers by the database layer.
+    Valid orders are persisted as one atomic batch. The CSV is cleared only
+    after the database transaction commits and the invalid-order report is
+    generated successfully.
+
     The preferred API receives the preview dictionary and requires explicit
     confirmation. A validation-result list is accepted for compatibility with
     the existing GUI, which calls this service after its confirmation dialog.
@@ -105,24 +109,18 @@ def import_csv_orders(preview, confirmed=False):
             "message": "No CSV orders are available to import.",
         }
 
-    saved_orders = []
-    skipped_orders = []
+    skipped_orders = [
+        {
+            "order": result["order"],
+            "errors": list(result["errors"]),
+            "suggestions": list(result.get("suggestions", [])),
+        }
+        for result in validation_results
+        if len(result["errors"]) > 0
+    ]
 
     try:
-        for result in validation_results:
-            order = result["order"]
-            errors = result["errors"]
-
-            if len(errors) == 0:
-                insert_order_into_database(order)
-                saved_orders.append(order)
-            else:
-                skipped_orders.append({
-                    "order": order,
-                    "errors": list(errors),
-                    "suggestions": list(result.get("suggestions", [])),
-                })
-
+        saved_orders = persist_validated_orders(validation_results)
         invalid_report_count = generate_invalid_orders_report(
             validation_results
         )
@@ -131,7 +129,7 @@ def import_csv_orders(preview, confirmed=False):
         return {
             "success": False,
             "cancelled": False,
-            "saved_orders": saved_orders,
+            "saved_orders": [],
             "skipped_orders": skipped_orders,
             "invalid_report_count": 0,
             "csv_cleared": False,
