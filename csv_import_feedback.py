@@ -1,5 +1,21 @@
+def build_skipped_order_feedback(skipped_order, report_generated=False):
+    """Builds truthful per-order feedback with or without a report file."""
+
+    order = skipped_order.get("order", {})
+    code = order.get("order_code") or "[missing code]"
+    lines = [f"{code}: NOT saved."]
+
+    for error in skipped_order.get("errors", []):
+        lines.append(f"  - {error}")
+
+    if report_generated:
+        lines.append("  Details were written to the invalid orders report.")
+
+    return lines
+
+
 def build_csv_import_feedback(result):
-    """Builds accurate GUI copy for successful and failed CSV imports."""
+    """Builds consistent operator feedback for one CSV import result."""
 
     saved_count = len(result.get("saved_orders", []))
     skipped_count = len(result.get("skipped_orders", []))

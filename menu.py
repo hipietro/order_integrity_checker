@@ -1,4 +1,8 @@
 from config import REPORT_FILE_NAME
+from csv_import_feedback import (
+    build_csv_import_feedback,
+    build_skipped_order_feedback,
+)
 from services import (
     clear_csv_input,
     create_order,
@@ -158,10 +162,13 @@ def import_valid_orders_cli():
         print(result["message"])
         return
 
-    if not result["success"]:
-        print(result["message"])
-        print("The CSV file was preserved.")
-        return
+    show_csv_import_result(result)
+
+
+def show_csv_import_result(result):
+    """Shows saved rows, skipped reasons and safe retry guidance."""
+
+    feedback = build_csv_import_feedback(result)
 
     print("\nIMPORT RESULT")
     print("-------------")
@@ -169,17 +176,21 @@ def import_valid_orders_cli():
     for order in result["saved_orders"]:
         print(f"{order['order_code']}: saved into database")
 
+    report_generated = result["invalid_report_count"] > 0
     for skipped_order in result["skipped_orders"]:
-        order = skipped_order["order"]
-        reasons = "; ".join(skipped_order["errors"])
-        print(f"{order['order_code']}: skipped — {reasons}")
+        for line in build_skipped_order_feedback(
+            skipped_order,
+            report_generated=report_generated,
+        ):
+            print(line)
 
     print("\nSUMMARY")
     print("-------")
-    print(f"Saved orders: {len(result['saved_orders'])}")
-    print(f"Invalid orders: {len(result['skipped_orders'])}")
-    print(f"Invalid orders report generated: {REPORT_FILE_NAME}")
-    print("CSV file cleared after successful import.")
+    for line in feedback["summary_lines"]:
+        print(line)
+
+    if result["invalid_report_count"] > 0:
+        print(f"Invalid orders report generated: {REPORT_FILE_NAME}")
 
 
 def show_invalid_orders_cli():

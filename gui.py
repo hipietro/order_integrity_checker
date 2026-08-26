@@ -2,9 +2,12 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
 from config import VALID_STATUSES
+from csv_import_feedback import (
+    build_csv_import_feedback,
+    build_skipped_order_feedback,
+)
 from customer_view import open_customer_browser
 from database import create_database, insert_sample_orders
-from gui_import_feedback import build_csv_import_feedback
 from order_view import open_order_browser, open_order_detail
 from services import (
     create_order,
@@ -703,12 +706,13 @@ class OrderIntegrityCheckerGUI:
         for order in result["saved_orders"]:
             self.write_output(f"{order['order_code']}: saved into database")
 
+        report_generated = result["invalid_report_count"] > 0
         for skipped_order in result["skipped_orders"]:
-            order = skipped_order["order"]
-            self.write_output(
-                f"{order['order_code']}: NOT saved. "
-                "Check the invalid orders report for details."
-            )
+            for line in build_skipped_order_feedback(
+                skipped_order,
+                report_generated=report_generated,
+            ):
+                self.write_output(line)
 
         feedback = build_csv_import_feedback(result)
 

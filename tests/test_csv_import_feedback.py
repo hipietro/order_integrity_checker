@@ -1,9 +1,12 @@
 import unittest
 
-from gui_import_feedback import build_csv_import_feedback
+from csv_import_feedback import (
+    build_csv_import_feedback,
+    build_skipped_order_feedback,
+)
 
 
-class TestGuiImportFeedback(unittest.TestCase):
+class TestCsvImportFeedback(unittest.TestCase):
     def test_success_feedback_reports_cleared_csv(self):
         feedback = build_csv_import_feedback({
             "success": True,
@@ -46,6 +49,27 @@ class TestGuiImportFeedback(unittest.TestCase):
         self.assertIn("Check the database before retrying", rendered)
         self.assertIn("1 saved", feedback["status"])
         self.assertEqual(feedback["dialog_title"], "Import failed")
+
+    def test_skipped_feedback_shows_reasons_when_report_is_missing(self):
+        lines = build_skipped_order_feedback({
+            "order": {"order_code": "ORD300"},
+            "errors": ["missing customer name"],
+        })
+
+        rendered = "\n".join(lines)
+        self.assertIn("missing customer name", rendered)
+        self.assertNotIn("report", rendered)
+
+    def test_skipped_feedback_mentions_report_only_when_generated(self):
+        lines = build_skipped_order_feedback(
+            {
+                "order": {"order_code": "ORD301"},
+                "errors": ["invalid quantity"],
+            },
+            report_generated=True,
+        )
+
+        self.assertIn("invalid orders report", "\n".join(lines))
 
 
 if __name__ == "__main__":
