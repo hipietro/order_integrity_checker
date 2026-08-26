@@ -4,6 +4,7 @@ from tkinter import messagebox, scrolledtext, ttk
 from config import VALID_STATUSES
 from customer_view import open_customer_browser
 from database import create_database, insert_sample_orders
+from gui_import_feedback import build_csv_import_feedback
 from order_view import open_order_browser, open_order_detail
 from services import (
     create_order,
@@ -709,22 +710,23 @@ class OrderIntegrityCheckerGUI:
                 "Check the invalid orders report for details."
             )
 
-        saved_count = len(result["saved_orders"])
-        skipped_count = len(result["skipped_orders"])
+        feedback = build_csv_import_feedback(result)
 
         self.write_output("\nSUMMARY")
         self.write_output("-------")
-        self.write_output(f"Saved orders: {saved_count}")
-        self.write_output(f"Invalid orders: {skipped_count}")
-        self.write_output("CSV file cleared after import.")
+        for line in feedback["summary_lines"]:
+            self.write_output(line)
 
-        self.set_status(
-            f"CSV import completed: {saved_count} saved, "
-            f"{skipped_count} invalid"
+        self.set_status(feedback["status"])
+
+        dialog = (
+            messagebox.showinfo
+            if feedback["dialog_kind"] == "info"
+            else messagebox.showerror
         )
-        messagebox.showinfo(
-            "Import completed",
-            "CSV import completed successfully.",
+        dialog(
+            feedback["dialog_title"],
+            feedback["dialog_message"],
         )
 
     def search_order_by_code(self):
