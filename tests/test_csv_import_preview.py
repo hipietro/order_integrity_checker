@@ -1,6 +1,9 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
+import csv_manager
 import services
 from csv_import_preview import build_csv_import_preview
 from csv_manager import CsvStructureError
@@ -298,6 +301,38 @@ class TestSafeCsvImportService(unittest.TestCase):
         )
         mock_validate.assert_called_once_with()
         mock_get_orders.assert_not_called()
+
+    def test_bom_encoded_csv_reaches_a_confirmable_preview(self):
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "orders.csv"
+            csv_path.write_text(
+                "order_code,customer_name,quantity,status\n"
+                "ORD029,Anna Verdi,4,pending\n",
+                encoding="utf-8-sig",
+                newline="",
+            )
+
+            with (
+                patch.object(
+                    csv_manager,
+                    "CSV_FILE_NAME",
+                    str(csv_path),
+                ),
+                patch(
+                    "validator.order_exists_in_database",
+                    return_value=False,
+                ),
+                patch("services.get_all_orders", return_value=[]),
+            ):
+                preview = services.preview_csv_import()
+
+        self.assertTrue(preview["structure_valid"])
+        self.assertTrue(preview["requires_confirmation"])
+        self.assertEqual(preview["total_orders"], 1)
+        self.assertEqual(
+            preview["orders_to_import"][0]["order_code"],
+            "ORD029",
+        )
 
     @patch("services.get_all_orders", return_value=[])
     @patch("services.validate_all_csv_orders")

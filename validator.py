@@ -1,5 +1,5 @@
 from config import VALID_STATUSES, REPORT_FILE_NAME
-from csv_manager import read_orders_from_csv
+from csv_manager import CsvStructureError, read_orders_from_csv
 from database import order_exists_in_database
 from normalizer import normalize_order
 from suggestion_engine import ORDER_CODE_PATTERN, generate_order_suggestions
@@ -69,7 +69,16 @@ def validate_all_csv_orders():
 def show_invalid_orders():
     """Shows invalid CSV orders with errors and actionable suggestions."""
 
-    validation_results = validate_all_csv_orders()
+    try:
+        validation_results = validate_all_csv_orders()
+    except CsvStructureError as error:
+        print("\nCSV STRUCTURE ERRORS")
+        print("--------------------")
+        for message in error.errors:
+            print(f"- {message}")
+        print("Fix the CSV structure before validating its orders.")
+        return
+
     found_invalid_orders = False
 
     print("\nINVALID CSV ORDERS")

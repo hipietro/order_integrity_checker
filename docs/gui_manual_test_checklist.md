@@ -51,6 +51,14 @@ Use this checklist after changing `gui.py` to confirm that the main order-manage
 
 - Preview and import a CSV containing both valid and invalid orders.
 - Confirm that invalid orders are skipped and reported.
+- Import a valid UTF-8 CSV whose first header includes a BOM and confirm that the
+  order code is recognized normally.
+- Try a CSV with a missing, duplicate, or unexpected header and confirm that the
+  GUI lists structural errors without showing the confirmation dialog.
+- Try records with one missing cell and one extra cell. Confirm that both line
+  numbers are reported, no order is imported, and the CSV remains unchanged.
+- Confirm that a header-only valid CSV is reported as containing no orders,
+  while a completely empty file is reported as structurally invalid.
 - Display statistics and verify that the total matches the database contents.
 
 ## Regression check

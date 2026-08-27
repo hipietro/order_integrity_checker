@@ -30,6 +30,7 @@ include = [
     "services.py",
     "validator.py",
     "normalizer.py",
+    "csv_manager.py",
     "csv_import_preview.py",
     "order_query_service.py",
     "duplicate_detector.py",

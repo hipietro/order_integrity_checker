@@ -1,7 +1,10 @@
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from unittest.mock import patch
 
-from validator import validate_order
+from csv_manager import CsvStructureError
+from validator import show_invalid_orders, validate_order
 
 
 class TestOrderValidation(unittest.TestCase):
@@ -77,6 +80,23 @@ class TestOrderValidation(unittest.TestCase):
         self.assertEqual(order["customer_name"], "Mario Rossi")
         self.assertEqual(order["quantity"], "7")
         self.assertEqual(order["status"], "pending")
+
+    @patch(
+        "validator.validate_all_csv_orders",
+        side_effect=CsvStructureError([
+            "Unexpected CSV header(s): 'notes'."
+        ]),
+    )
+    def test_legacy_invalid_order_view_shows_structural_errors(self, mock_validate):
+        output = StringIO()
+
+        with redirect_stdout(output):
+            show_invalid_orders()
+
+        self.assertIn("CSV STRUCTURE ERRORS", output.getvalue())
+        self.assertIn("Unexpected CSV header", output.getvalue())
+        self.assertNotIn("No invalid orders found", output.getvalue())
+        mock_validate.assert_called_once_with()
 
 
 if __name__ == "__main__":

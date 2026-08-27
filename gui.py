@@ -629,6 +629,43 @@ class OrderIntegrityCheckerGUI:
         self.clear_output()
         preview = preview_csv_import()
 
+        structural_errors = list(preview.get("structural_errors", []))
+        structure_valid = preview.get(
+            "structure_valid",
+            len(structural_errors) == 0,
+        )
+
+        if not structure_valid or structural_errors:
+            if not structural_errors:
+                structural_errors.append(
+                    "CSV structure could not be verified."
+                )
+
+            self.write_output("CSV STRUCTURE ERRORS")
+            self.write_output("--------------------")
+            for error in structural_errors:
+                self.write_output(f"- {error}")
+            self.write_output("\nFix the CSV structure before importing.")
+            self.set_status("CSV structure invalid")
+
+            visible_errors = structural_errors[:8]
+            dialog_details = "\n".join(
+                f"- {error}" for error in visible_errors
+            )
+            hidden_count = len(structural_errors) - len(visible_errors)
+            if hidden_count > 0:
+                dialog_details += (
+                    f"\n- ... and {hidden_count} more error(s). "
+                    "See the activity output for details."
+                )
+
+            messagebox.showerror(
+                "Invalid CSV structure",
+                "The CSV file cannot be imported until its structure is "
+                f"fixed.\n\n{dialog_details}",
+            )
+            return
+
         valid_orders = preview["valid_orders"]
         invalid_orders = preview["invalid_orders"]
 

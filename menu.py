@@ -118,11 +118,48 @@ def show_order_quality_scores(preview):
             print(f"- {explanation}")
 
 
+def get_csv_structure_errors(preview):
+    """Returns actionable errors when CSV structure is explicitly invalid."""
+
+    structural_errors = list(preview.get("structural_errors", []))
+    structure_valid = preview.get(
+        "structure_valid",
+        len(structural_errors) == 0,
+    )
+
+    if not structure_valid and not structural_errors:
+        structural_errors.append(
+            "CSV structure could not be verified."
+        )
+
+    return structural_errors
+
+
+def show_csv_structure_errors(preview):
+    """Shows file-level CSV errors and reports whether import must stop."""
+
+    structural_errors = get_csv_structure_errors(preview)
+
+    if not structural_errors:
+        return False
+
+    print("\nCSV STRUCTURE ERRORS")
+    print("--------------------")
+    for error in structural_errors:
+        print(f"- {error}")
+    print("Fix the CSV structure before importing.")
+    return True
+
+
 def show_csv_import_preview(preview):
     """Shows counts, quality scores, error totals and skipped-order reasons."""
 
     print("\nCSV IMPORT PREVIEW")
     print("------------------")
+
+    if show_csv_structure_errors(preview):
+        return
+
     print(f"Total CSV orders: {preview['total_orders']}")
     print(f"Orders to import: {preview['valid_orders']}")
     print(f"Orders to skip: {preview['invalid_orders']}")
@@ -144,6 +181,9 @@ def import_valid_orders_cli():
 
     preview = preview_csv_import()
     show_csv_import_preview(preview)
+
+    if get_csv_structure_errors(preview):
+        return
 
     if preview["total_orders"] == 0:
         print("No orders found. The database and CSV file were not modified.")
@@ -186,6 +226,10 @@ def show_invalid_orders_cli():
     """Shows invalid CSV orders from the command-line interface."""
 
     preview = preview_csv_import()
+
+    if show_csv_structure_errors(preview):
+        return
+
     show_validation_problems(preview["validation_results"])
 
 
