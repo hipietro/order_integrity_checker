@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import services
 from csv_import_preview import build_csv_import_preview
+from csv_manager import CsvStructureError
 
 
 class TestCsvImportPreviewBuilder(unittest.TestCase):
@@ -46,6 +47,8 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
     def test_preview_contains_counts_and_order_details(self):
         preview = build_csv_import_preview(self.validation_results)
 
+        self.assertTrue(preview["structure_valid"])
+        self.assertEqual(preview["structural_errors"], [])
         self.assertEqual(preview["total_orders"], 3)
         self.assertEqual(preview["valid_orders"], 1)
         self.assertEqual(preview["invalid_orders"], 2)
@@ -97,6 +100,19 @@ class TestCsvImportPreviewBuilder(unittest.TestCase):
 
         self.assertEqual(preview["average_quality_score"], 75.0)
         self.assertEqual(preview["review_recommended_orders"], 1)
+
+    def test_structural_errors_disable_confirmation(self):
+        preview = build_csv_import_preview(
+            self.validation_results,
+            structural_errors=["Missing required CSV header(s): status."],
+        )
+
+        self.assertFalse(preview["structure_valid"])
+        self.assertEqual(
+            preview["structural_errors"],
+            ["Missing required CSV header(s): status."],
+        )
+        self.assertFalse(preview["requires_confirmation"])
 
 
 class TestSafeCsvImportService(unittest.TestCase):
@@ -217,6 +233,37 @@ class TestSafeCsvImportService(unittest.TestCase):
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
 
+    @patch("services.clear_csv_orders")
+    @patch("services.generate_invalid_orders_report")
+    @patch("services.persist_validated_orders")
+    def test_structurally_invalid_preview_never_mutates_state(
+        self,
+        mock_persist,
+        mock_report,
+        mock_clear,
+    ):
+        invalid_preview = build_csv_import_preview(
+            self.preview["validation_results"],
+            structural_errors=["Unexpected CSV header(s): 'notes'."],
+        )
+
+        result = services.import_csv_orders(
+            invalid_preview,
+            confirmed=True,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertFalse(result["cancelled"])
+        self.assertEqual(result["saved_orders"], [])
+        self.assertEqual(
+            result["structural_errors"],
+            ["Unexpected CSV header(s): 'notes'."],
+        )
+        self.assertFalse(result["csv_cleared"])
+        mock_persist.assert_not_called()
+        mock_report.assert_not_called()
+        mock_clear.assert_not_called()
+
     @patch("services.validate_all_csv_orders", return_value=[])
     def test_empty_preview_does_not_require_confirmation(self, mock_validate):
         preview = services.preview_csv_import()
@@ -227,6 +274,30 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertEqual(preview["suggestion_count"], 0)
         self.assertEqual(preview["orders_with_suggestions"], 0)
         mock_validate.assert_called_once_with()
+
+    @patch("services.get_all_orders")
+    @patch(
+        "services.validate_all_csv_orders",
+        side_effect=CsvStructureError([
+            "Missing required CSV header(s): quantity."
+        ]),
+    )
+    def test_preview_surfaces_structure_error_without_database_read(
+        self,
+        mock_validate,
+        mock_get_orders,
+    ):
+        preview = services.preview_csv_import()
+
+        self.assertFalse(preview["structure_valid"])
+        self.assertFalse(preview["requires_confirmation"])
+        self.assertEqual(preview["validation_results"], [])
+        self.assertEqual(
+            preview["structural_errors"],
+            ["Missing required CSV header(s): quantity."],
+        )
+        mock_validate.assert_called_once_with()
+        mock_get_orders.assert_not_called()
 
     @patch("services.get_all_orders", return_value=[])
     @patch("services.validate_all_csv_orders")

@@ -1,7 +1,11 @@
 from atomic_import_service import persist_validated_orders
 from config import EXPORT_FILE_NAME
 from csv_import_preview import build_csv_import_preview
-from csv_manager import clear_csv_orders, export_orders_to_csv
+from csv_manager import (
+    CsvStructureError,
+    clear_csv_orders,
+    export_orders_to_csv,
+)
 from database import (
     delete_order_from_database,
     get_all_customers,
@@ -63,7 +67,14 @@ def _score_csv_validation_results(validation_results):
 def preview_csv_import():
     """Validates and scores CSV orders without modifying stored data."""
 
-    validation_results = validate_all_csv_orders()
+    try:
+        validation_results = validate_all_csv_orders()
+    except CsvStructureError as error:
+        return build_csv_import_preview(
+            [],
+            structural_errors=error.errors,
+        )
+
     scored_results = _score_csv_validation_results(validation_results)
     return build_csv_import_preview(scored_results)
 
@@ -84,6 +95,29 @@ def import_csv_orders(preview, confirmed=False):
     if isinstance(preview, list):
         preview = build_csv_import_preview(preview)
         confirmed = True
+
+    structural_errors = list(preview.get("structural_errors", []))
+    structure_valid = preview.get(
+        "structure_valid",
+        len(structural_errors) == 0,
+    )
+
+    if not structure_valid or structural_errors:
+        details = " ".join(structural_errors)
+        message = "CSV structure is invalid. Fix the file before importing."
+        if details:
+            message += f" {details}"
+
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": [],
+            "skipped_orders": [],
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "structural_errors": structural_errors,
+            "message": message,
+        }
 
     if not confirmed:
         return {
