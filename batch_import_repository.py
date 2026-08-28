@@ -1,6 +1,7 @@
 import sqlite3
 
-from config import DATABASE_NAME
+from application_errors import OrderConflictError, StorageUnavailableError
+from config import DATABASE_NAME, SQLITE_BUSY_TIMEOUT_SECONDS
 from normalizer import (
     normalize_customer_key,
     normalize_customer_name,
@@ -11,9 +12,21 @@ from normalizer import (
 def _connect(database_name):
     """Creates a SQLite connection suitable for one atomic import batch."""
 
-    connection = sqlite3.connect(database_name)
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    connection = None
+
+    try:
+        connection = sqlite3.connect(
+            database_name,
+            timeout=SQLITE_BUSY_TIMEOUT_SECONDS,
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+    except sqlite3.Error as error:
+        if connection is not None:
+            connection.close()
+        raise StorageUnavailableError(
+            "Order storage is temporarily unavailable."
+        ) from error
 
 
 def _get_or_create_customer(cursor, customer_name):
@@ -87,6 +100,16 @@ def insert_orders_atomically(orders, database_name=DATABASE_NAME):
 
         connection.commit()
         return normalized_orders
+    except sqlite3.IntegrityError as error:
+        connection.rollback()
+        raise OrderConflictError(
+            "The import conflicts with existing stored data."
+        ) from error
+    except sqlite3.Error as error:
+        connection.rollback()
+        raise StorageUnavailableError(
+            "Order storage is temporarily unavailable."
+        ) from error
     except Exception:
         connection.rollback()
         raise

@@ -2,6 +2,9 @@
 # SQLite stores the whole database inside a single local file.
 DATABASE_NAME = "orders.db"
 
+# Maximum time a write waits for a locked SQLite database.
+SQLITE_BUSY_TIMEOUT_SECONDS = 2.0
+
 # Directory and filename prefix used for local database recovery points.
 BACKUP_DIRECTORY = "backups"
 BACKUP_FILE_PREFIX = "orders_backup"

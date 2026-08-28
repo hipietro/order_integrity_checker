@@ -84,7 +84,30 @@ This separation makes the endpoints suitable for deployment probes: liveness can
 }
 ```
 
-Accepted statuses are `completed`, `pending`, and `cancelled`. Invalid request shapes are rejected by FastAPI/Pydantic, while business validation errors are returned with HTTP 422. Missing resources return HTTP 404.
+Accepted statuses are `completed`, `pending`, and `cancelled`. Invalid request shapes and business validation failures return HTTP 422. Missing resources return HTTP 404, duplicate order codes return HTTP 409, and locked or unavailable SQLite storage returns HTTP 503.
+
+## Write error responses
+
+Expected write failures use a stable FastAPI error envelope:
+
+```json
+{
+  "detail": {
+    "code": "order_conflict",
+    "message": "An order with code ORD100 already exists.",
+    "errors": []
+  }
+}
+```
+
+| Status | `detail.code` | Meaning |
+| --- | --- | --- |
+| 404 | `order_not_found` | The target order does not exist |
+| 409 | `order_conflict` | The order code conflicts with stored data |
+| 422 | `validation_failed` | The request fails business validation |
+| 503 | `storage_unavailable` | SQLite is locked or cannot complete the operation |
+
+Storage failures never include raw SQLite messages or local filesystem paths. Create, update, and delete writes roll back and close their database connections on failure.
 
 ## Architecture
 

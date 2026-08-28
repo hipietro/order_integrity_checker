@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import services
+from application_errors import CsvStructureError
 from csv_import_preview import build_csv_import_preview
 
 
@@ -212,7 +213,8 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertFalse(result["cancelled"])
         self.assertEqual(result["saved_orders"], [])
         self.assertFalse(result["csv_cleared"])
-        self.assertIn("database unavailable", result["message"])
+        self.assertNotIn("database unavailable", result["message"])
+        self.assertIn("No data was modified", result["message"])
         mock_persist.assert_called_once()
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
@@ -227,6 +229,49 @@ class TestSafeCsvImportService(unittest.TestCase):
         self.assertEqual(preview["suggestion_count"], 0)
         self.assertEqual(preview["orders_with_suggestions"], 0)
         mock_validate.assert_called_once_with()
+
+    @patch(
+        "services.validate_all_csv_orders",
+        side_effect=CsvStructureError([
+            "Missing required CSV column(s): status."
+        ]),
+    )
+    def test_structural_errors_are_actionable_and_block_confirmation(
+        self,
+        mock_validate,
+    ):
+        preview = services.preview_csv_import()
+
+        self.assertTrue(preview["import_blocked"])
+        self.assertFalse(preview["requires_confirmation"])
+        self.assertEqual(
+            preview["structure_errors"],
+            ["Missing required CSV column(s): status."],
+        )
+        mock_validate.assert_called_once_with()
+
+    @patch("services.clear_csv_orders")
+    @patch("services.generate_invalid_orders_report")
+    @patch("services.persist_validated_orders")
+    def test_confirmation_cannot_bypass_structural_errors(
+        self,
+        mock_persist,
+        mock_report,
+        mock_clear,
+    ):
+        preview = build_csv_import_preview(
+            [],
+            structure_errors=["Unexpected CSV column(s): notes."],
+        )
+
+        result = services.import_csv_orders(preview, confirmed=True)
+
+        self.assertFalse(result["success"])
+        self.assertFalse(result["csv_cleared"])
+        self.assertIn("blocked", result["message"])
+        mock_persist.assert_not_called()
+        mock_report.assert_not_called()
+        mock_clear.assert_not_called()
 
     @patch("services.get_all_orders", return_value=[])
     @patch("services.validate_all_csv_orders")

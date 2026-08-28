@@ -637,6 +637,20 @@ class OrderIntegrityCheckerGUI:
         self.write_output(f"Valid orders ready to import: {valid_orders}")
         self.write_output(f"Invalid orders found: {invalid_orders}")
 
+        if preview.get("structure_errors"):
+            self.write_output("")
+            self.write_output("CSV STRUCTURE ERRORS")
+            self.write_output("--------------------")
+            for error in preview["structure_errors"]:
+                self.write_output(f"- {error}")
+            self.set_status("CSV import blocked: invalid file structure")
+            messagebox.showerror(
+                "Import CSV orders",
+                "The CSV structure is invalid. Fix the listed problems "
+                "before importing.",
+            )
+            return
+
         if preview["average_quality_score"] is not None:
             self.write_output(
                 f"Average quality score: {preview['average_quality_score']}/100"

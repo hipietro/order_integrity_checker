@@ -1,10 +1,45 @@
 # Order Integrity Checker
 
 ![Quality checks](https://github.com/hipietro/order_integrity_checker/actions/workflows/tests.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/storage-SQLite-003B57?logo=sqlite&logoColor=white)
+![Status](https://img.shields.io/badge/status-feature--complete-2E7D32)
 
-Order Integrity Checker is a Python portfolio project for validating, importing, reviewing, and managing business orders stored in SQLite. It models a realistic data-quality workflow: incoming CSV records are normalized, validated, checked for suspicious duplicates, scored for quality, and either accepted or reported with actionable suggestions.
+**A production-minded Python application for validating, importing, reviewing, and managing business orders.**
 
-The same application logic is reused by a CLI, a responsive Tkinter desktop interface, and an optional FastAPI REST API.
+Incoming CSV records are normalized, validated, checked for suspicious duplicates, scored for quality, and committed to SQLite as an atomic batch. The same service layer powers a CLI, a responsive Tkinter desktop app, and a FastAPI REST API.
+
+> **Project status:** feature-complete and maintenance-only. The planned development backlog is finished; the repository remains available as a stable portfolio project and reference implementation.
+
+## At a glance
+
+| Area | What the project demonstrates |
+| --- | --- |
+| Data integrity | Exact CSV contracts, business validation, normalization, duplicate review, quality scoring |
+| Reliability | Atomic imports, transactional audit history, rollback-safe writes, backup and restore |
+| API design | Stable 404/409/422/503 semantics with sanitized error envelopes |
+| Architecture | Shared services behind CLI, Tkinter, and FastAPI interfaces |
+| Engineering quality | Automated tests, coverage threshold, linting, CI, reproducible UI screenshots |
+
+## Quick start
+
+```bash
+git clone https://github.com/hipietro/order_integrity_checker.git
+cd order_integrity_checker
+python3 -m pip install -r requirements-dev.txt
+python3 main.py
+```
+
+Choose the interface that fits your use case:
+
+```bash
+python3 main.py                         # interactive CLI
+python3 gui.py                          # Tkinter desktop app
+python3 -m uvicorn api:app --reload     # REST API + OpenAPI docs
+```
+
+The CLI and GUI initialize the local SQLite schema. The API documentation is then available at `http://127.0.0.1:8000/docs`.
 
 ## Why this project
 
@@ -20,6 +55,24 @@ The project focuses on software-engineering practices that transfer to productio
 - safe database backup and restore
 - CLI, Tkinter GUI, and REST interfaces over shared business logic
 - automated tests, linting, coverage enforcement, and GitHub Actions CI
+
+## Architecture
+
+```text
+CLI / Tkinter / FastAPI
+          │
+          ▼
+ Shared service layer
+          │
+          ├── normalization + validation + quality analysis
+          ├── atomic CSV import boundary
+          └── explicit domain/storage failures
+          │
+          ▼
+   SQLite repositories
+```
+
+The interface layers contain no SQL. Persistence errors are translated once into explicit application outcomes, so a missing order remains a 404, a duplicate becomes a 409, invalid input stays a 422, and unavailable storage becomes a sanitized 503.
 
 ## Visual examples
 
@@ -41,13 +94,15 @@ The reproducible capture, verification, and release process for visual assets is
 
 ### Order integrity
 
+- Accept UTF-8 CSV files with or without a BOM and require the exact supported columns.
+- Block imports with missing, duplicate, or unexpected headers and with short/long rows.
 - Normalize order codes, customer names, quantities, and statuses before validation.
 - Reject missing fields, unsupported statuses, invalid quantities, duplicate CSV codes, and codes already present in the database.
 - Detect suspicious near-duplicate orders without automatically rejecting them.
 - Calculate explainable quality scores and flag records that deserve review.
 - Generate suggested fixes for malformed codes, misspelled statuses, whitespace problems, and unusual quantities.
 - Preview CSV imports before any persistent change is made.
-- Import valid rows only after explicit confirmation and report skipped rows with reasons.
+- Import valid rows only after explicit confirmation and commit the full valid batch atomically.
 
 ### Persistence and recovery
 
@@ -56,6 +111,7 @@ The reproducible capture, verification, and release process for visual assets is
 - Record every real order-status transition with timestamped history.
 - Preserve status history after an active order is deleted.
 - Create timestamped SQLite backups, list them, validate them before restore, and preserve the current database when validation fails.
+- Roll back and close every create, update, and delete transaction when a write fails.
 
 ### Interfaces
 
@@ -107,9 +163,11 @@ order_integrity_checker/
 │   ├── suggested_fixes.md
 │   └── suspicious_duplicate_detection.md
 ├── tests/
+├── application_errors.py
 ├── api.py
 ├── api_schemas.py
 ├── backup_service.py
+├── batch_import_repository.py
 ├── capture_gui_screenshot.py
 ├── config.py
 ├── csv_import_preview.py
@@ -165,6 +223,8 @@ cancelled
 
 ## Example CSV input
 
+The input contract requires exactly these four unique headers: `order_code`, `customer_name`, `quantity`, and `status`. UTF-8 BOM input is accepted; malformed headers and rows block confirmation before any database change. See [`docs/csv_contract.md`](docs/csv_contract.md) for the complete behavior.
+
 ```csv
 order_code,customer_name,quantity,status
 ORD001,Mario Rossi,12,completed
@@ -176,6 +236,8 @@ ORD003,Paolo Gialli,4,completed
 ```
 
 ## Run the application
+
+The quick-start commands above cover the primary interfaces. The following sections describe the workflow available in each one.
 
 ### CLI
 
@@ -251,8 +313,8 @@ GitHub Actions runs linting, tests, and coverage checks on pushes and pull reque
 
 ## Documentation
 
-Feature-specific design notes live under `docs/`, including CSV preview behavior, customer normalization, order detail views, quality scoring, duplicate detection, suggested fixes, status history, REST API usage, database recovery, GUI behavior, and screenshot maintenance.
+Feature-specific design notes live under `docs/`, including the [CSV contract](docs/csv_contract.md), [atomic import behavior](docs/atomic_csv_import.md), [REST API](docs/rest_api.md), customer normalization, order detail views, quality scoring, duplicate detection, suggested fixes, status history, database recovery, GUI behavior, and screenshot maintenance.
 
 ## Purpose
 
-This project is part of a practical Python learning path and is intentionally built as a recruiter-facing example of incremental software engineering: each feature is represented by a focused issue, implementation, automated validation where appropriate, and documentation that explains the design decisions.
+This repository is a recruiter-facing example of incremental software engineering: focused requirements, layered implementation, automated verification, explicit failure semantics, and documentation that explains the design decisions. Its planned feature development is complete.

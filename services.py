@@ -1,5 +1,11 @@
 from atomic_import_service import persist_validated_orders
-from config import EXPORT_FILE_NAME
+from application_errors import (
+    CsvStructureError,
+    OrderConflictError,
+    OrderNotFoundError,
+    StorageUnavailableError,
+)
+from config import EXPORT_FILE_NAME, VALID_STATUSES
 from csv_import_preview import build_csv_import_preview
 from csv_manager import clear_csv_orders, export_orders_to_csv
 from database import (
@@ -63,7 +69,11 @@ def _score_csv_validation_results(validation_results):
 def preview_csv_import():
     """Validates and scores CSV orders without modifying stored data."""
 
-    validation_results = validate_all_csv_orders()
+    try:
+        validation_results = validate_all_csv_orders()
+    except CsvStructureError as error:
+        return build_csv_import_preview([], structure_errors=error.errors)
+
     scored_results = _score_csv_validation_results(validation_results)
     return build_csv_import_preview(scored_results)
 
@@ -96,6 +106,20 @@ def import_csv_orders(preview, confirmed=False):
             "message": "CSV import cancelled. No data was modified.",
         }
 
+    if preview.get("import_blocked", False):
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": [],
+            "skipped_orders": [],
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": (
+                "CSV import blocked. Fix the file structure and preview it "
+                "again."
+            ),
+        }
+
     validation_results = preview.get("validation_results", [])
 
     if len(validation_results) == 0:
@@ -125,7 +149,7 @@ def import_csv_orders(preview, confirmed=False):
             validation_results
         )
         clear_csv_orders()
-    except Exception as error:
+    except OrderConflictError:
         return {
             "success": False,
             "cancelled": False,
@@ -133,7 +157,35 @@ def import_csv_orders(preview, confirmed=False):
             "skipped_orders": skipped_orders,
             "invalid_report_count": 0,
             "csv_cleared": False,
-            "message": f"CSV import failed: {error}",
+            "message": (
+                "CSV import failed because an order code conflicts with "
+                "stored data."
+            ),
+        }
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": [],
+            "skipped_orders": skipped_orders,
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": (
+                "CSV import failed because order storage is temporarily "
+                "unavailable."
+            ),
+        }
+    except Exception:
+        return {
+            "success": False,
+            "cancelled": False,
+            "saved_orders": [],
+            "skipped_orders": skipped_orders,
+            "invalid_report_count": 0,
+            "csv_cleared": False,
+            "message": (
+                "CSV import failed before completion. No data was modified."
+            ),
         }
 
     return {
@@ -266,21 +318,59 @@ def create_order(order):
     """
 
     normalized_order = normalize_order(order)
-    errors = validate_order(normalized_order, [])
+    try:
+        errors = validate_order(normalized_order, [])
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "order": normalized_order,
+            "errors": [],
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     if len(errors) > 0:
+        is_conflict = "order code already exists in database" in errors
         return {
             "success": False,
             "order": normalized_order,
             "errors": errors,
+            "error_code": "conflict" if is_conflict else "validation",
+            "message": (
+                f"An order with code {normalized_order['order_code']} "
+                "already exists."
+                if is_conflict
+                else "Order validation failed."
+            ),
         }
 
-    insert_order_into_database(normalized_order)
+    try:
+        insert_order_into_database(normalized_order)
+    except OrderConflictError:
+        return {
+            "success": False,
+            "order": normalized_order,
+            "errors": [],
+            "error_code": "conflict",
+            "message": (
+                f"An order with code {normalized_order['order_code']} "
+                "already exists."
+            ),
+        }
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "order": normalized_order,
+            "errors": [],
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     return {
         "success": True,
         "order": normalized_order,
         "errors": [],
+        "error_code": None,
     }
 
 
@@ -296,27 +386,57 @@ def update_order_status(order_code, new_status):
     normalized_code = normalize_order_code(order_code)
     normalized_status = normalize_status(new_status)
 
-    order = get_order_by_code(normalized_code)
+    if normalized_status not in VALID_STATUSES:
+        return {
+            "success": False,
+            "error_code": "validation",
+            "message": "Order status is invalid.",
+        }
+
+    try:
+        order = get_order_by_code(normalized_code)
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     if order is None:
         return {
             "success": False,
+            "error_code": "not_found",
             "message": f"No order found with code {normalized_code}.",
         }
 
-    updated = update_order_status_in_database(
-        normalized_code,
-        normalized_status,
-    )
+    try:
+        updated = update_order_status_in_database(
+            normalized_code,
+            normalized_status,
+        )
+    except OrderNotFoundError:
+        return {
+            "success": False,
+            "error_code": "not_found",
+            "message": f"No order found with code {normalized_code}.",
+        }
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     if updated:
         return {
             "success": True,
+            "error_code": None,
             "message": f"Order {normalized_code} updated successfully.",
         }
 
     return {
         "success": False,
+        "error_code": "storage_unavailable",
         "message": f"Order {normalized_code} could not be updated.",
     }
 
@@ -367,24 +487,47 @@ def delete_order(order_code):
     """Deletes an existing order from the database."""
 
     normalized_code = normalize_order_code(order_code)
-    order = get_order_by_code(normalized_code)
+    try:
+        order = get_order_by_code(normalized_code)
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     if order is None:
         return {
             "success": False,
+            "error_code": "not_found",
             "message": f"No order found with code {normalized_code}.",
         }
 
-    deleted = delete_order_from_database(normalized_code)
+    try:
+        deleted = delete_order_from_database(normalized_code)
+    except OrderNotFoundError:
+        return {
+            "success": False,
+            "error_code": "not_found",
+            "message": f"No order found with code {normalized_code}.",
+        }
+    except StorageUnavailableError:
+        return {
+            "success": False,
+            "error_code": "storage_unavailable",
+            "message": "Order storage is temporarily unavailable.",
+        }
 
     if deleted:
         return {
             "success": True,
+            "error_code": None,
             "message": f"Order {normalized_code} deleted successfully.",
         }
 
     return {
         "success": False,
+        "error_code": "storage_unavailable",
         "message": f"Order {normalized_code} could not be deleted.",
     }
 

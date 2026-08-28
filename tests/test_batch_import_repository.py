@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from application_errors import OrderConflictError
 from batch_import_repository import insert_orders_atomically
 
 
@@ -119,7 +120,7 @@ class TestAtomicBatchImportRepository(unittest.TestCase):
             },
         ]
 
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises(OrderConflictError):
             insert_orders_atomically(
                 orders,
                 database_name=str(self.database_path),

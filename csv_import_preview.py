@@ -1,5 +1,7 @@
-def build_csv_import_preview(validation_results):
+def build_csv_import_preview(validation_results, structure_errors=None):
     """Builds a reusable, read-only summary of validated CSV orders."""
+
+    structure_errors = list(structure_errors or [])
 
     orders_to_import = []
     orders_to_skip = []
@@ -61,5 +63,9 @@ def build_csv_import_preview(validation_results):
         "orders_with_suggestions": orders_with_suggestions,
         "average_quality_score": average_quality_score,
         "review_recommended_orders": review_recommended_orders,
-        "requires_confirmation": len(validation_results) > 0,
+        "structure_errors": structure_errors,
+        "import_blocked": len(structure_errors) > 0,
+        "requires_confirmation": (
+            len(validation_results) > 0 and len(structure_errors) == 0
+        ),
     }

@@ -127,6 +127,14 @@ def show_csv_import_preview(preview):
     print(f"Orders to import: {preview['valid_orders']}")
     print(f"Orders to skip: {preview['invalid_orders']}")
 
+    if preview.get("structure_errors"):
+        print("\nCSV STRUCTURE ERRORS")
+        print("--------------------")
+        for error in preview["structure_errors"]:
+            print(f"- {error}")
+        print("Import is blocked until the CSV structure is fixed.")
+        return
+
     show_order_quality_scores(preview)
 
     if len(preview["error_summary"]) > 0:
@@ -144,6 +152,10 @@ def import_valid_orders_cli():
 
     preview = preview_csv_import()
     show_csv_import_preview(preview)
+
+    if preview.get("import_blocked", False):
+        print("The database and CSV file were not modified.")
+        return
 
     if preview["total_orders"] == 0:
         print("No orders found. The database and CSV file were not modified.")

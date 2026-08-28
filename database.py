@@ -1,6 +1,11 @@
 import sqlite3
 
-from config import DATABASE_NAME, VALID_STATUSES
+from application_errors import (
+    OrderConflictError,
+    OrderNotFoundError,
+    StorageUnavailableError,
+)
+from config import DATABASE_NAME, SQLITE_BUSY_TIMEOUT_SECONDS, VALID_STATUSES
 from normalizer import (
     normalize_customer_key,
     normalize_customer_name,
@@ -13,9 +18,34 @@ from normalizer import (
 def _connect():
     """Creates a SQLite connection with foreign-key checks enabled."""
 
-    connection = sqlite3.connect(DATABASE_NAME)
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    connection = None
+
+    try:
+        connection = sqlite3.connect(
+            DATABASE_NAME,
+            timeout=SQLITE_BUSY_TIMEOUT_SECONDS,
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+    except sqlite3.Error as error:
+        if connection is not None:
+            connection.close()
+        raise StorageUnavailableError(
+            "Order storage is temporarily unavailable."
+        ) from error
+
+
+def _raise_write_error(error):
+    """Maps SQLite details to stable errors without exposing internals."""
+
+    if isinstance(error, sqlite3.IntegrityError):
+        raise OrderConflictError(
+            "The order conflicts with existing stored data."
+        ) from error
+
+    raise StorageUnavailableError(
+        "Order storage is temporarily unavailable."
+    ) from error
 
 
 def _create_orders_table(cursor):
@@ -341,23 +371,28 @@ def get_order_by_code(order_code):
     normalized_code = normalize_order_code(order_code)
 
     connection = _connect()
-    cursor = connection.cursor()
 
-    cursor.execute("""
-        SELECT
-            orders.id,
-            orders.order_code,
-            customers.id,
-            customers.name,
-            orders.quantity,
-            orders.status
-        FROM orders
-        INNER JOIN customers ON customers.id = orders.customer_id
-        WHERE orders.order_code = ?
-    """, (normalized_code,))
-
-    row = cursor.fetchone()
-    connection.close()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT
+                orders.id,
+                orders.order_code,
+                customers.id,
+                customers.name,
+                orders.quantity,
+                orders.status
+            FROM orders
+            INNER JOIN customers ON customers.id = orders.customer_id
+            WHERE orders.order_code = ?
+        """, (normalized_code,))
+        row = cursor.fetchone()
+    except sqlite3.Error as error:
+        raise StorageUnavailableError(
+            "Order storage is temporarily unavailable."
+        ) from error
+    finally:
+        connection.close()
 
     if row is None:
         return None
@@ -397,9 +432,9 @@ def insert_order_into_database(order):
     normalized_order = normalize_order(order)
 
     connection = _connect()
-    cursor = connection.cursor()
 
     try:
+        cursor = connection.cursor()
         customer_id = _get_or_create_customer_with_cursor(
             cursor,
             normalized_order["customer_name"],
@@ -421,9 +456,9 @@ def insert_order_into_database(order):
         ))
 
         connection.commit()
-    except sqlite3.Error:
+    except sqlite3.Error as error:
         connection.rollback()
-        raise
+        _raise_write_error(error)
     finally:
         connection.close()
 
@@ -466,9 +501,9 @@ def update_order_status_in_database(order_code, new_status):
         return False
 
     connection = _connect()
-    cursor = connection.cursor()
 
     try:
+        cursor = connection.cursor()
         cursor.execute("""
             SELECT status
             FROM orders
@@ -478,7 +513,9 @@ def update_order_status_in_database(order_code, new_status):
         row = cursor.fetchone()
 
         if row is None:
-            return False
+            raise OrderNotFoundError(
+                f"No order found with code {normalized_code}."
+            )
 
         old_status = row[0]
 
@@ -493,7 +530,9 @@ def update_order_status_in_database(order_code, new_status):
 
         if cursor.rowcount == 0:
             connection.rollback()
-            return False
+            raise OrderNotFoundError(
+                f"No order found with code {normalized_code}."
+            )
 
         cursor.execute("""
             INSERT INTO order_status_history (
@@ -510,9 +549,12 @@ def update_order_status_in_database(order_code, new_status):
 
         connection.commit()
         return True
-    except sqlite3.Error:
+    except sqlite3.Error as error:
         connection.rollback()
-        return False
+        _raise_write_error(error)
+    except OrderNotFoundError:
+        connection.rollback()
+        raise
     finally:
         connection.close()
 
@@ -523,15 +565,26 @@ def delete_order_from_database(order_code):
     normalized_code = normalize_order_code(order_code)
 
     connection = _connect()
-    cursor = connection.cursor()
 
-    cursor.execute("""
-        DELETE FROM orders
-        WHERE order_code = ?
-    """, (normalized_code,))
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            DELETE FROM orders
+            WHERE order_code = ?
+        """, (normalized_code,))
 
-    connection.commit()
-    deleted_rows = cursor.rowcount
-    connection.close()
+        if cursor.rowcount == 0:
+            raise OrderNotFoundError(
+                f"No order found with code {normalized_code}."
+            )
 
-    return deleted_rows > 0
+        connection.commit()
+        return True
+    except sqlite3.Error as error:
+        connection.rollback()
+        _raise_write_error(error)
+    except OrderNotFoundError:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()

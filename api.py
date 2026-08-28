@@ -25,6 +25,39 @@ app = FastAPI(
 )
 
 
+def _raise_order_write_error(result):
+    """Maps stable service failures to stable HTTP error envelopes."""
+
+    error_code = result.get("error_code")
+    if error_code is None:
+        error_code = (
+            "not_found"
+            if result.get("message", "").startswith("No order found")
+            else "validation"
+        )
+    status_codes = {
+        "not_found": status.HTTP_404_NOT_FOUND,
+        "conflict": status.HTTP_409_CONFLICT,
+        "validation": status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "storage_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    }
+    public_codes = {
+        "not_found": "order_not_found",
+        "conflict": "order_conflict",
+        "validation": "validation_failed",
+        "storage_unavailable": "storage_unavailable",
+    }
+
+    raise HTTPException(
+        status_code=status_codes[error_code],
+        detail={
+            "code": public_codes[error_code],
+            "message": result["message"],
+            "errors": result.get("errors", []),
+        },
+    )
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -63,13 +96,7 @@ def create_order_endpoint(payload: OrderCreateRequest):
         "status": payload.status,
     })
     if not result["success"]:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Order validation failed.",
-                "errors": result["errors"],
-            },
-        )
+        _raise_order_write_error(result)
     return result["order"]
 
 
@@ -80,7 +107,7 @@ def update_order_status_endpoint(
 ):
     result = update_order_status(order_code, payload.status)
     if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
+        _raise_order_write_error(result)
     return result
 
 
@@ -88,7 +115,7 @@ def update_order_status_endpoint(
 def delete_order_endpoint(order_code: str):
     result = delete_order(order_code)
     if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
+        _raise_order_write_error(result)
     return None
 
 

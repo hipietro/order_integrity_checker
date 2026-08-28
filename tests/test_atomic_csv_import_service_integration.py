@@ -83,7 +83,8 @@ class TestAtomicCsvImportServiceIntegration(unittest.TestCase):
         self.assertEqual(result["saved_orders"], [])
         self.assertEqual(result["invalid_report_count"], 0)
         self.assertFalse(result["csv_cleared"])
-        self.assertIn("late batch conflict", result["message"])
+        self.assertNotIn("late batch conflict", result["message"])
+        self.assertIn("No data was modified", result["message"])
         self.assertEqual(len(result["skipped_orders"]), 1)
         mock_persist_validated_orders.assert_called_once_with(
             preview["validation_results"]
