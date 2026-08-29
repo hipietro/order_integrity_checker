@@ -46,6 +46,9 @@ class TestAtomicCsvImportServiceIntegration(unittest.TestCase):
         result = services.import_csv_orders(preview, confirmed=True)
 
         self.assertTrue(result["success"])
+        self.assertTrue(result["orders_committed"])
+        self.assertIsNone(result["failure_stage"])
+        self.assertTrue(result["report_generated"])
         self.assertEqual(result["saved_orders"], [saved_order])
         self.assertEqual(result["invalid_report_count"], 1)
         self.assertTrue(result["csv_cleared"])
@@ -80,6 +83,9 @@ class TestAtomicCsvImportServiceIntegration(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertFalse(result["cancelled"])
+        self.assertFalse(result["orders_committed"])
+        self.assertEqual(result["failure_stage"], "persistence")
+        self.assertFalse(result["report_generated"])
         self.assertEqual(result["saved_orders"], [])
         self.assertEqual(result["invalid_report_count"], 0)
         self.assertFalse(result["csv_cleared"])

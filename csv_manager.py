@@ -1,10 +1,15 @@
 import csv
+import os
+import stat
+import tempfile
+from pathlib import Path
 
 from application_errors import CsvStructureError
 from config import CSV_FILE_NAME, EXPORT_FILE_NAME
 
 
 CSV_COLUMNS = ("order_code", "customer_name", "quantity", "status")
+CSV_HEADER = ",".join(CSV_COLUMNS) + "\n"
 
 
 def _describe_columns(columns):
@@ -87,6 +92,14 @@ def read_orders_from_csv():
         return orders
 
 
+def _write_cleared_csv_contents(file):
+    """Writes and syncs the replacement contents before publication."""
+
+    file.write(CSV_HEADER)
+    file.flush()
+    os.fsync(file.fileno())
+
+
 def clear_csv_orders():
     """
     Clears the CSV file while keeping the header row.
@@ -94,10 +107,39 @@ def clear_csv_orders():
     This allows the file to remain valid and ready for new orders.
     """
 
-    with open(CSV_FILE_NAME, "w", encoding="utf-8", newline="") as file:
-        file.write("order_code,customer_name,quantity,status\n")
+    target_path = Path(CSV_FILE_NAME)
+    temporary_path = None
+    target_mode = None
 
-    print(f"{CSV_FILE_NAME} cleared successfully.")
+    try:
+        target_mode = stat.S_IMODE(target_path.stat().st_mode)
+    except FileNotFoundError:
+        pass
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=target_path.parent,
+            prefix=f".{target_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            _write_cleared_csv_contents(temporary_file)
+
+        if target_mode is not None:
+            os.chmod(temporary_path, target_mode)
+        os.replace(temporary_path, target_path)
+    except Exception:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
 
 def export_orders_to_csv(orders):
     '''

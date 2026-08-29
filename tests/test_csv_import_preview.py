@@ -161,6 +161,9 @@ class TestSafeCsvImportService(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertFalse(result["cancelled"])
+        self.assertTrue(result["orders_committed"])
+        self.assertIsNone(result["failure_stage"])
+        self.assertTrue(result["report_generated"])
         self.assertEqual(len(result["saved_orders"]), 1)
         self.assertEqual(len(result["skipped_orders"]), 1)
         self.assertEqual(
@@ -211,6 +214,9 @@ class TestSafeCsvImportService(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertFalse(result["cancelled"])
+        self.assertFalse(result["orders_committed"])
+        self.assertEqual(result["failure_stage"], "persistence")
+        self.assertFalse(result["report_generated"])
         self.assertEqual(result["saved_orders"], [])
         self.assertFalse(result["csv_cleared"])
         self.assertNotIn("database unavailable", result["message"])
@@ -218,6 +224,83 @@ class TestSafeCsvImportService(unittest.TestCase):
         mock_persist.assert_called_once()
         mock_report.assert_not_called()
         mock_clear.assert_not_called()
+
+    @patch("services.clear_csv_orders")
+    @patch(
+        "services.generate_invalid_orders_report",
+        side_effect=OSError("private report path"),
+    )
+    @patch("services.persist_validated_orders")
+    def test_report_failure_preserves_committed_order_result_and_csv(
+        self,
+        mock_persist,
+        mock_report,
+        mock_clear,
+    ):
+        saved_orders = list(self.preview["orders_to_import"])
+        mock_persist.return_value = saved_orders
+
+        result = services.import_csv_orders(self.preview, confirmed=True)
+
+        self.assertFalse(result["success"])
+        self.assertTrue(result["orders_committed"])
+        self.assertEqual(result["failure_stage"], "invalid_report")
+        self.assertFalse(result["report_generated"])
+        self.assertEqual(result["saved_orders"], saved_orders)
+        self.assertEqual(result["invalid_report_count"], 0)
+        self.assertFalse(result["csv_cleared"])
+        self.assertIn("1 order was saved", result["message"])
+        self.assertIn("before retrying", result["message"])
+        self.assertNotIn("private report path", result["message"])
+        mock_report.assert_called_once_with(self.preview["validation_results"])
+        mock_clear.assert_not_called()
+
+    @patch("services.clear_csv_orders", side_effect=OSError("private CSV path"))
+    @patch("services.generate_invalid_orders_report", return_value=1)
+    @patch("services.persist_validated_orders")
+    def test_cleanup_failure_preserves_committed_orders_and_report_count(
+        self,
+        mock_persist,
+        mock_report,
+        mock_clear,
+    ):
+        saved_orders = list(self.preview["orders_to_import"])
+        mock_persist.return_value = saved_orders
+
+        result = services.import_csv_orders(self.preview, confirmed=True)
+
+        self.assertFalse(result["success"])
+        self.assertTrue(result["orders_committed"])
+        self.assertEqual(result["failure_stage"], "csv_cleanup")
+        self.assertTrue(result["report_generated"])
+        self.assertEqual(result["saved_orders"], saved_orders)
+        self.assertEqual(result["invalid_report_count"], 1)
+        self.assertFalse(result["csv_cleared"])
+        self.assertIn("1 order was saved", result["message"])
+        self.assertIn("before retrying", result["message"])
+        self.assertNotIn("private CSV path", result["message"])
+        mock_report.assert_called_once_with(self.preview["validation_results"])
+        mock_clear.assert_called_once_with()
+
+    @patch("services.clear_csv_orders")
+    @patch("services.generate_invalid_orders_report", return_value=0)
+    @patch("services.persist_validated_orders")
+    def test_zero_invalid_report_is_still_marked_as_generated(
+        self,
+        mock_persist,
+        mock_report,
+        mock_clear,
+    ):
+        saved_orders = list(self.preview["orders_to_import"])
+        mock_persist.return_value = saved_orders
+
+        result = services.import_csv_orders(self.preview, confirmed=True)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["invalid_report_count"], 0)
+        self.assertTrue(result["report_generated"])
+        mock_report.assert_called_once_with(self.preview["validation_results"])
+        mock_clear.assert_called_once_with()
 
     @patch("services.validate_all_csv_orders", return_value=[])
     def test_empty_preview_does_not_require_confirmation(self, mock_validate):

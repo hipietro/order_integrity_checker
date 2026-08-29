@@ -51,6 +51,16 @@ The CSV file is cleared only after:
 
 If an exception occurs before completion, the service returns an unsuccessful result and preserves the CSV file for investigation or retry.
 
+Cleanup writes and syncs a temporary file in the same directory, preserves the existing file mode, and then publishes the header-only replacement atomically. A temporary-write or replacement failure removes the temporary file and leaves the original input unchanged.
+
+Failure results distinguish where the lifecycle stopped:
+
+- `failure_stage="persistence"`: the database batch rolled back, `saved_orders=[]`, and no report or cleanup was attempted;
+- `failure_stage="invalid_report"`: persistence completed, the actual committed rows remain in `saved_orders`, and cleanup was not attempted;
+- `failure_stage="csv_cleanup"`: persistence and report generation completed, the actual committed rows remain in `saved_orders`, and the original CSV remains available.
+
+`report_generated` distinguishes a successful report containing zero invalid rows from a report failure. For either post-commit failure, `success=False` prevents a false success message while `orders_committed` and `saved_orders` warn the operator that retrying without inspecting the database can create conflicts. Error messages are sanitized and never include filesystem details.
+
 ## CLI behavior
 
 The main CLI shows the following before asking for confirmation:

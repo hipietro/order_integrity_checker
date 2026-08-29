@@ -36,10 +36,13 @@ The lifecycle is intentionally ordered as follows:
 1. collect invalid rows for the skipped-order response;
 2. persist all valid rows in one atomic SQLite batch;
 3. generate the invalid-order report only after the batch commits;
-4. clear the CSV only after persistence and report generation succeed;
-5. return the committed orders in `saved_orders`.
+4. write and sync replacement CSV contents in a temporary file;
+5. atomically replace the input only after persistence and report generation succeed;
+6. return the committed orders in `saved_orders`.
 
 If batch persistence raises an exception, the service returns `success=False`, reports `saved_orders=[]`, leaves `csv_cleared=False`, and does not generate a report or clear the CSV. This matches the database rollback contract and avoids claiming that partially inserted rows were saved.
+
+Report and cleanup failures happen after the database transaction has committed. These outcomes also return `success=False`, but retain every committed order in `saved_orders`, expose `failure_stage` as `invalid_report` or `csv_cleanup`, and warn the operator to inspect the database before retrying. `report_generated` records whether report creation completed even when its invalid-row count is zero. Atomic replacement ensures that cleanup failures do not leave a truncated input file.
 
 Manual single-order creation remains independent: `services.create_order()` still validates one order and calls `database.insert_order_into_database()` directly.
 
@@ -57,4 +60,7 @@ Automated coverage includes:
 - confirmed service imports delegating to the atomic batch boundary;
 - report generation and CSV clearing after successful persistence;
 - `saved_orders=[]`, no report, and no CSV clearing after batch failure;
+- committed-order reporting after report or cleanup failure;
+- preservation of the original CSV after partial temporary writes or failed replacement;
+- identical retry-safe outcome wording in CLI and Tkinter interfaces;
 - a service-level SQLite integration test that forces a late UNIQUE conflict and verifies both the earlier order and newly created customers are rolled back.

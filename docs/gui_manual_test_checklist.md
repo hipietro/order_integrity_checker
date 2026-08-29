@@ -50,7 +50,12 @@ Use this checklist after changing `gui.py` to confirm that the main order-manage
 ## CSV import and statistics
 
 - Preview and import a CSV containing both valid and invalid orders.
-- Confirm that invalid orders are skipped and reported.
+- Confirm that invalid orders show their validation reasons directly.
+- Confirm that the report is mentioned only after it has been generated.
+- On success, confirm that saved order codes are listed and the GUI says the CSV was cleared.
+- Exercise the rollback result with a test build or mocked service result; confirm that the GUI shows an error, reports zero saved orders, and says the CSV was not cleared.
+- Exercise `invalid_report` and `csv_cleanup` results with a test build or mocked service result; confirm that the GUI shows an error, lists the already committed order codes, says the CSV was not cleared, and warns before retry.
+- Confirm that no failure path displays the **Import completed** dialog or a cleared-CSV claim.
 - Display statistics and verify that the total matches the database contents.
 
 ## Regression check
