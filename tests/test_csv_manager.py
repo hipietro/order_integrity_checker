@@ -87,6 +87,8 @@ class CsvCleanupTests(unittest.TestCase):
         self,
         mock_print,
     ):
+        self.csv_path.chmod(0o640)
+
         with patch("csv_manager.CSV_FILE_NAME", str(self.csv_path)):
             clear_csv_orders()
 
@@ -94,6 +96,7 @@ class CsvCleanupTests(unittest.TestCase):
             self.csv_path.read_text(encoding="utf-8"),
             CSV_HEADER,
         )
+        self.assertEqual(self.csv_path.stat().st_mode & 0o777, 0o640)
         self.assertEqual(self.temporary_files(), [])
         mock_print.assert_not_called()
 

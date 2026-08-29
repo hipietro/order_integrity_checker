@@ -1,5 +1,6 @@
 import csv
 import os
+import stat
 import tempfile
 from pathlib import Path
 
@@ -108,6 +109,12 @@ def clear_csv_orders():
 
     target_path = Path(CSV_FILE_NAME)
     temporary_path = None
+    target_mode = None
+
+    try:
+        target_mode = stat.S_IMODE(target_path.stat().st_mode)
+    except FileNotFoundError:
+        pass
 
     try:
         with tempfile.NamedTemporaryFile(
@@ -122,6 +129,8 @@ def clear_csv_orders():
             temporary_path = Path(temporary_file.name)
             _write_cleared_csv_contents(temporary_file)
 
+        if target_mode is not None:
+            os.chmod(temporary_path, target_mode)
         os.replace(temporary_path, target_path)
     except Exception:
         if temporary_path is not None:
