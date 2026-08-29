@@ -78,6 +78,69 @@ def preview_csv_import():
     return build_csv_import_preview(scored_results)
 
 
+def _build_csv_import_result(
+    *,
+    success,
+    cancelled,
+    saved_orders,
+    skipped_orders,
+    message,
+    invalid_report_count=0,
+    csv_cleared=False,
+    failure_stage=None,
+):
+    """Builds one stable result shape for every CSV import outcome."""
+
+    saved_orders = list(saved_orders)
+    skipped_orders = list(skipped_orders)
+
+    return {
+        "success": success,
+        "cancelled": cancelled,
+        "saved_orders": saved_orders,
+        "skipped_orders": skipped_orders,
+        "invalid_report_count": invalid_report_count,
+        "csv_cleared": csv_cleared,
+        "orders_committed": bool(saved_orders),
+        "failure_stage": failure_stage,
+        "message": message,
+    }
+
+
+def _build_post_commit_failure(
+    *,
+    saved_orders,
+    skipped_orders,
+    failure_stage,
+    failed_action,
+    invalid_report_count=0,
+):
+    """Reports an incomplete finalization without hiding committed rows."""
+
+    saved_count = len(saved_orders)
+    if saved_count == 0:
+        persistence_summary = "No orders needed to be saved"
+    elif saved_count == 1:
+        persistence_summary = "1 order was saved to the database"
+    else:
+        persistence_summary = f"{saved_count} orders were saved to the database"
+
+    return _build_csv_import_result(
+        success=False,
+        cancelled=False,
+        saved_orders=saved_orders,
+        skipped_orders=skipped_orders,
+        invalid_report_count=invalid_report_count,
+        csv_cleared=False,
+        failure_stage=failure_stage,
+        message=(
+            f"{persistence_summary}, but {failed_action} could not be "
+            "completed. The CSV was not cleared. Inspect the database and "
+            "input file before retrying."
+        ),
+    )
+
+
 def import_csv_orders(preview, confirmed=False):
     """
     Imports orders from a previously generated preview.
@@ -96,42 +159,39 @@ def import_csv_orders(preview, confirmed=False):
         confirmed = True
 
     if not confirmed:
-        return {
-            "success": False,
-            "cancelled": True,
-            "saved_orders": [],
-            "skipped_orders": preview.get("orders_to_skip", []),
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": "CSV import cancelled. No data was modified.",
-        }
+        return _build_csv_import_result(
+            success=False,
+            cancelled=True,
+            saved_orders=[],
+            skipped_orders=preview.get("orders_to_skip", []),
+            failure_stage=None,
+            message="CSV import cancelled. No data was modified.",
+        )
 
     if preview.get("import_blocked", False):
-        return {
-            "success": False,
-            "cancelled": False,
-            "saved_orders": [],
-            "skipped_orders": [],
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": (
+        return _build_csv_import_result(
+            success=False,
+            cancelled=False,
+            saved_orders=[],
+            skipped_orders=[],
+            failure_stage="structure_validation",
+            message=(
                 "CSV import blocked. Fix the file structure and preview it "
                 "again."
             ),
-        }
+        )
 
     validation_results = preview.get("validation_results", [])
 
     if len(validation_results) == 0:
-        return {
-            "success": False,
-            "cancelled": False,
-            "saved_orders": [],
-            "skipped_orders": [],
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": "No CSV orders are available to import.",
-        }
+        return _build_csv_import_result(
+            success=False,
+            cancelled=False,
+            saved_orders=[],
+            skipped_orders=[],
+            failure_stage="input",
+            message="No CSV orders are available to import.",
+        )
 
     skipped_orders = [
         {
@@ -145,58 +205,76 @@ def import_csv_orders(preview, confirmed=False):
 
     try:
         saved_orders = persist_validated_orders(validation_results)
-        invalid_report_count = generate_invalid_orders_report(
-            validation_results
-        )
-        clear_csv_orders()
     except OrderConflictError:
-        return {
-            "success": False,
-            "cancelled": False,
-            "saved_orders": [],
-            "skipped_orders": skipped_orders,
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": (
+        return _build_csv_import_result(
+            success=False,
+            cancelled=False,
+            saved_orders=[],
+            skipped_orders=skipped_orders,
+            failure_stage="persistence",
+            message=(
                 "CSV import failed because an order code conflicts with "
                 "stored data."
             ),
-        }
+        )
     except StorageUnavailableError:
-        return {
-            "success": False,
-            "cancelled": False,
-            "saved_orders": [],
-            "skipped_orders": skipped_orders,
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": (
+        return _build_csv_import_result(
+            success=False,
+            cancelled=False,
+            saved_orders=[],
+            skipped_orders=skipped_orders,
+            failure_stage="persistence",
+            message=(
                 "CSV import failed because order storage is temporarily "
                 "unavailable."
             ),
-        }
+        )
     except Exception:
-        return {
-            "success": False,
-            "cancelled": False,
-            "saved_orders": [],
-            "skipped_orders": skipped_orders,
-            "invalid_report_count": 0,
-            "csv_cleared": False,
-            "message": (
-                "CSV import failed before completion. No data was modified."
+        return _build_csv_import_result(
+            success=False,
+            cancelled=False,
+            saved_orders=[],
+            skipped_orders=skipped_orders,
+            failure_stage="persistence",
+            message=(
+                "CSV import failed before the database commit. No data was "
+                "modified."
             ),
-        }
+        )
 
-    return {
-        "success": True,
-        "cancelled": False,
-        "saved_orders": saved_orders,
-        "skipped_orders": skipped_orders,
-        "invalid_report_count": invalid_report_count,
-        "csv_cleared": True,
-        "message": "CSV import completed successfully.",
-    }
+    try:
+        invalid_report_count = generate_invalid_orders_report(
+            validation_results
+        )
+    except Exception:
+        return _build_post_commit_failure(
+            saved_orders=saved_orders,
+            skipped_orders=skipped_orders,
+            failure_stage="invalid_report",
+            failed_action="the invalid-order report",
+        )
+
+    try:
+        clear_csv_orders()
+    except Exception:
+        return _build_post_commit_failure(
+            saved_orders=saved_orders,
+            skipped_orders=skipped_orders,
+            invalid_report_count=invalid_report_count,
+            failure_stage="csv_cleanup",
+            failed_action="CSV cleanup",
+        )
+
+    return _build_csv_import_result(
+        success=True,
+        cancelled=False,
+        saved_orders=saved_orders,
+        skipped_orders=skipped_orders,
+        invalid_report_count=invalid_report_count,
+        csv_cleared=True,
+        failure_stage=None,
+        message="CSV import completed successfully.",
+    )
 
 
 def get_database_orders():
