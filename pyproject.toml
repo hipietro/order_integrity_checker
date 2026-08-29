@@ -31,6 +31,7 @@ include = [
     "validator.py",
     "normalizer.py",
     "csv_import_preview.py",
+    "csv_import_feedback.py",
     "order_query_service.py",
     "duplicate_detector.py",
     "quality_scorer.py",

@@ -86,6 +86,7 @@ def _build_csv_import_result(
     skipped_orders,
     message,
     invalid_report_count=0,
+    report_generated=False,
     csv_cleared=False,
     failure_stage=None,
 ):
@@ -100,6 +101,7 @@ def _build_csv_import_result(
         "saved_orders": saved_orders,
         "skipped_orders": skipped_orders,
         "invalid_report_count": invalid_report_count,
+        "report_generated": report_generated,
         "csv_cleared": csv_cleared,
         "orders_committed": bool(saved_orders),
         "failure_stage": failure_stage,
@@ -114,6 +116,7 @@ def _build_post_commit_failure(
     failure_stage,
     failed_action,
     invalid_report_count=0,
+    report_generated=False,
 ):
     """Reports an incomplete finalization without hiding committed rows."""
 
@@ -131,6 +134,7 @@ def _build_post_commit_failure(
         saved_orders=saved_orders,
         skipped_orders=skipped_orders,
         invalid_report_count=invalid_report_count,
+        report_generated=report_generated,
         csv_cleared=False,
         failure_stage=failure_stage,
         message=(
@@ -261,6 +265,7 @@ def import_csv_orders(preview, confirmed=False):
             saved_orders=saved_orders,
             skipped_orders=skipped_orders,
             invalid_report_count=invalid_report_count,
+            report_generated=True,
             failure_stage="csv_cleanup",
             failed_action="CSV cleanup",
         )
@@ -271,6 +276,7 @@ def import_csv_orders(preview, confirmed=False):
         saved_orders=saved_orders,
         skipped_orders=skipped_orders,
         invalid_report_count=invalid_report_count,
+        report_generated=True,
         csv_cleared=True,
         failure_stage=None,
         message="CSV import completed successfully.",

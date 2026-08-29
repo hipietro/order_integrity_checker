@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
 from config import VALID_STATUSES
+from csv_import_feedback import build_csv_import_feedback
 from customer_view import open_customer_browser
 from database import create_database, insert_sample_orders
 from order_view import open_order_browser, open_order_detail
@@ -709,37 +710,26 @@ class OrderIntegrityCheckerGUI:
             return
 
         result = import_csv_orders(preview, confirmed=True)
+        feedback = build_csv_import_feedback(result)
 
         self.write_output("\nIMPORT RESULT")
         self.write_output("-------------")
 
-        for order in result["saved_orders"]:
-            self.write_output(f"{order['order_code']}: saved into database")
+        for line in feedback["lines"]:
+            self.write_output(line)
 
-        for skipped_order in result["skipped_orders"]:
-            order = skipped_order["order"]
-            self.write_output(
-                f"{order['order_code']}: NOT saved. "
-                "Check the invalid orders report for details."
+        self.set_status(feedback["status_message"])
+
+        if feedback["outcome"] == "success":
+            messagebox.showinfo(
+                feedback["dialog_title"],
+                feedback["dialog_message"],
             )
-
-        saved_count = len(result["saved_orders"])
-        skipped_count = len(result["skipped_orders"])
-
-        self.write_output("\nSUMMARY")
-        self.write_output("-------")
-        self.write_output(f"Saved orders: {saved_count}")
-        self.write_output(f"Invalid orders: {skipped_count}")
-        self.write_output("CSV file cleared after import.")
-
-        self.set_status(
-            f"CSV import completed: {saved_count} saved, "
-            f"{skipped_count} invalid"
-        )
-        messagebox.showinfo(
-            "Import completed",
-            "CSV import completed successfully.",
-        )
+        else:
+            messagebox.showerror(
+                feedback["dialog_title"],
+                feedback["dialog_message"],
+            )
 
     def search_order_by_code(self):
         """Searches an order and opens its unified detail view."""
